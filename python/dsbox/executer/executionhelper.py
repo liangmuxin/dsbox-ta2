@@ -22,7 +22,7 @@ import inspect
 import importlib
 import traceback
 
-from builtins import range
+from builtins import range, zip
 
 # For DSBox Imputation arguments
 from dsbox.schema.problem_schema import TaskType, TaskSubType, Metric
@@ -382,14 +382,16 @@ class ExecutionHelper(object):
                     index_columns.append(colname)
                 if varType == 'file' and varFileType == 'tabular':
                     tabular_columns.append(colname)
-                    for index, row in df.iterrows():
-                        filename = row[colname]
-                        if not filename in self.nested_table:
-                            csvfile = self.directory + os.sep + 'raw_data' + os.sep + df.loc[index, colname]
-                            if not os.path.exists(csvfile):
-                                csvfile += '.gz'
-                            nested_df = self.read_data(csvfile, [], None)
-                            self.nested_table[filename] = nested_df
+                    filename = df.loc[:, colname].unique()
+                    if len(filename) > 1:
+                        raise AssertionError('Expecting one unique filename per column: {}'.format(colname))
+                    filename = filename[0]
+                    if not filename in self.nested_table:
+                        csvfile = self.directory + os.sep + 'raw_data' + os.sep + filename
+                        if not os.path.exists(csvfile):
+                            csvfile += '.gz'
+                        nested_df = self.read_data(csvfile, [], None)
+                        self.nested_table[filename] = nested_df
 
             # Match index columns to tabular columns
             if len(tabular_columns) == len(index_columns) - 1:
@@ -408,26 +410,36 @@ class ExecutionHelper(object):
                 varFileType = col.get('varFileType', None)
                 if varRole == 'file' or varType == 'file':
                     # If the role is "file", then load in the raw data files
-                    for index, row in df.iterrows():
-                        filepath = self.directory + os.sep + 'raw_data' + os.sep + row[colname]
-                        if self.media_type == VariableFileType.TEXT:
-                            # Plain data load for text files
-                            with open(filepath, 'rb') as myfile:
-                                txt = myfile.read()
-                                df.set_value(index, colname, txt)
-                        elif self.media_type == VariableFileType.IMAGE:
-                            # Load image files using keras with a standard target size
-                            # TODO: Make the (224, 224) size configurable
-                            from keras.preprocessing import image
-                            df.set_value(index, colname, image.load_img(filepath, target_size=(224, 224)))
-                if varType == 'file' and varFileType == 'tabular':
-                    pos  = tabular_columns.index(colname)
-                    index_colname = index_columns[pos]
-                    for index in range(df.shape[0]):
-                        filename = row[colname]
-                        nested_data = NestedData(colname, index_colname, filename,
-                                                 df.loc[index, index_colname], self.nested_table[filename])
-                        df.set_value(index, colname, nested_data)
+                    if self.media_type in (VariableFileType.TEXT, VariableFileType.IMAGE):
+                        for index, row in df.iterrows():
+                            filepath = self.directory + os.sep + 'raw_data' + os.sep + row[colname]
+                            if self.media_type == VariableFileType.TEXT:
+                                # Plain data load for text files
+                                with open(filepath, 'rb') as myfile:
+                                    txt = myfile.read()
+                                    df.set_value(index, colname, txt)
+                            elif self.media_type == VariableFileType.IMAGE:
+                                # Load image files using keras with a standard target size
+                                # TODO: Make the (224, 224) size configurable
+                                from keras.preprocessing import image
+                                df.set_value(index, colname, image.load_img(filepath, target_size=(224, 224)))
+
+            for file_colname, index_colname in zip(tabular_columns, index_columns):
+                before = df.columns
+                filename = df.iloc[0][file_colname]
+                nested_table = self.nested_table[filename]
+                df = pd.merge(df, nested_table, on=index_colname)
+                after = df.columns
+                for nested_colname in nested_table.columns:
+                    if not nested_colname == index_colname:
+                        cols.append({'varName': nested_colname})
+                print('Columns before and after merge')
+                print(before)
+                print(after)
+                print(cols)
+
+            if cols:
+                self.columns = cols
 
         return df
 
