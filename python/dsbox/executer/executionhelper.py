@@ -46,7 +46,10 @@ class ExecutionHelper(object):
         self.columns = self.schema['trainData']['trainData']
         self.targets = self.schema['trainData']['trainTargets']
         self.indexcol = self.get_index_column(self.columns)
+
+        # TODO: New dataset format has varFileFormat annotation for individual columns
         self.media_type = self.get_media_type(self.schema, self.columns)
+
         self.data = None
         self.nested_table = dict()
         if csvfile:
@@ -344,9 +347,17 @@ class ExecutionHelper(object):
             csvfile = csvfile[:-3]
 
         # Read the csv file while specifying the index column
-        df = pd.read_csv(csvfile, index_col=indexcol)
-        #df = df.reindex(pd.RangeIndex(df.index.max()+1)).ffill()
-        df = df.reset_index(drop=True)
+
+        # kyao: d3mIndex column needed for some tabular datasets, i.e. new r_26 dataset.
+        # df = pd.read_csv(csvfile, index_col=indexcol)
+        df = pd.read_csv(csvfile)
+
+        # df = df.reindex(pd.RangeIndex(df.index.max()+1)).ffill()
+
+        # kyao
+        # df = df.reset_index(drop=True)
+        if indexcol is not None:
+            df.set_index(indexcol, drop=False)
 
         # Filter columns if specified
         if len(cols) > 0:
@@ -360,24 +371,41 @@ class ExecutionHelper(object):
                     df.drop(colname, axis=1, inplace=True)
 
             # Check for nested tabular data files, and load them in
+            tabular_columns = []
+            index_columns = []
             for col in cols:
                 colname = col['varName']
                 varRole = col.get('varRole', None)
                 varType = col.get('varType', None)
-                if varRole == 'file' or varType == 'file':
+                varFileType = col.get('varFileType', None)
+                if varRole == 'index':
+                    index_columns.append(colname)
+                if varType == 'file' and varFileType == 'tabular':
+                    tabular_columns.append(colname)
                     for index, row in df.iterrows():
                         filename = row[colname]
-                        if self.media_type is VariableFileType.TABULAR:
-                            if not filename in self.nested_table:
-                                nested_df = self.read_data(self.directory + os.sep + 'raw_data'
-                                    + os.sep + df.loc[index, colname] + ".gz", [], None)
-                                self.nested_table[filename] = nested_df
+                        if not filename in self.nested_table:
+                            csvfile = self.directory + os.sep + 'raw_data' + os.sep + df.loc[index, colname]
+                            if not os.path.exists(csvfile):
+                                csvfile += '.gz'
+                            nested_df = self.read_data(csvfile, [], None)
+                            self.nested_table[filename] = nested_df
+
+            # Match index columns to tabular columns
+            if len(tabular_columns) == len(index_columns) - 1:
+                # New r_32 dataset has two tublar columns and three index columns. Need to remove d3mIndex
+                # New r_26 dataset has exactly one tubular column and one index column (d3mIndex)
+                index_columns = index_columns[1:]
+            if not len(tabular_columns) == len(index_columns):
+                raise AssertionError('Number tabular and index columns do not match: {} != {}'
+                                     .format(len(tabular_columns), (index_columns)))
 
             # Check all columns for special roles
             for col in cols:
                 colname = col['varName']
                 varRole = col.get('varRole', None)
                 varType = col.get('varType', None)
+                varFileType = col.get('varFileType', None)
                 if varRole == 'file' or varType == 'file':
                     # If the role is "file", then load in the raw data files
                     for index, row in df.iterrows():
@@ -392,12 +420,13 @@ class ExecutionHelper(object):
                             # TODO: Make the (224, 224) size configurable
                             from keras.preprocessing import image
                             df.set_value(index, colname, image.load_img(filepath, target_size=(224, 224)))
-                if varRole == 'index' and colname.endswith('_index'):
-                    filename_colname = colname[:-6]
+                if varType == 'file' and varFileType == 'tabular':
+                    pos  = tabular_columns.index(colname)
+                    index_colname = index_columns[pos]
                     for index in range(df.shape[0]):
-                        filename = row[filename_colname]
-                        nested_data = NestedData(filename_colname, colname, filename, df.loc[index, colname],
-                                                 self.nested_table[filename])
+                        filename = row[colname]
+                        nested_data = NestedData(colname, index_colname, filename,
+                                                 df.loc[index, index_colname], self.nested_table[filename])
                         df.set_value(index, colname, nested_data)
 
         return df
