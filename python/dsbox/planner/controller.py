@@ -31,8 +31,9 @@ class Controller(object):
     and the primitives library directory, and it generates plans by calling out to L1, L2
     and L3 planners.
     """
-    def __init__(self, libdir):
+    def __init__(self, libdir, debug=False):
         self.libdir = os.path.abspath(libdir)
+        self.debug = debug
         self.train_dm = DataManager()
         self.test_dm = DataManager()
         self.sm = SchemaManager()
@@ -59,8 +60,9 @@ class Controller(object):
         self.errorfile = open("%s%sstderr.txt" % (self.tmp_dir, os.sep), 'w')
         self.pipelinesfile = open("%s%spipelines.txt" % (self.tmp_dir, os.sep), 'w')
 
-        # Redirect stderr to error file
-        sys.stderr = self.errorfile
+        # Redirect stderr to error file, if not debugging
+        if not self.debug:
+            sys.stderr = self.errorfile
 
     '''
     Set config directories and schema from just datadir and outputdir

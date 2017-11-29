@@ -46,6 +46,7 @@ USAGE
     parser.add_argument("-o", "--output", dest="output", help="Output directory. [default: %(default)s]", default="output")
     parser.add_argument("-v", "--verbose", dest="verbose", action="count", help="set verbosity level [default: %(default)s]")
     parser.add_argument('-V', '--version', action='version', version=program_version_message)
+    parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='Debug. Do not redirect stderr to file')
 
     # Process arguments
     args = parser.parse_args()
@@ -67,7 +68,9 @@ USAGE
     if verbose > 0:
         print("Verbose mode on")
 
-    controller = Controller(library_directory)
+    debug = args.debug
+
+    controller = Controller(library_directory, debug=debug)
     controller.set_config_simple(data_directory, output_directory)
     controller.load_problem_schema()
     controller.initialize_training_data_from_defaults()
@@ -78,6 +81,6 @@ USAGE
 
 if __name__ == "__main__":
     if DEBUG:
-        sys.argv.append("-h")
         sys.argv.append("-v")
+        sys.argv.append("-d")
     sys.exit(main())
