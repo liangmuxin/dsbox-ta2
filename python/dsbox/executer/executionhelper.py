@@ -10,7 +10,9 @@ import tempfile
 import numpy as np
 import pandas as pd
 
-
+from d3m_metadata import hyperparams, metadata as metadata_module, params, container, utils
+from d3m_metadata.container import ndarray
+from d3m_metadata.container import List
 from primitive_interfaces.base import PrimitiveBase
 from primitive_interfaces.generator import GeneratorPrimitiveBase
 from primitive_interfaces.supervised_learning import SupervisedLearnerPrimitiveBase
@@ -387,34 +389,51 @@ class ExecutionHelper(object):
                 df = pd.concat([df, newdf], axis=1)
                 df.columns=ncols
             elif self.data_manager.media_type == VariableFileType.AUDIO:
+                if executable is None:
+                    primitive.finished = True
+                executable = self.instantiate_primitive(primitive)
+                features = executable.produce(inputs=df).value
+                print('###########print len of features/features[0] (in featurise)###############')
+                print(len(features))
+                print(features[0])
+                print('###########################################################################')
+                #print(len(df))
                 # Featurize audio
-                fcols = []
-                for idx, row in df.iterrows():
-                    if row[col] is None:
-                        continue
-                    (audio_clip, sampling_rate) = row[col]
-                    primitive.init_kwargs['sampling_rate'] = int(sampling_rate)
-                    executable = self.instantiate_primitive(primitive)
-                    if executable is None:
-                        primitive.finished = True
-                        return None
-                    #executable.fit('time_series', [audio_clip])
-                    features = executable.produce([audio_clip])[0]
+                #fcols = []
+                #for idx, row in df.iterrows():
+                #    if row[col] is None:
+                #        continue
+                #    (audio_clip, sampling_rate) = row[col]
+                #    audio = List[ndarray]([audio_clip], {
+                #    'schema': metadata_module.CONTAINER_SCHEMA_VERSION,
+                #    'structural_type': List[ndarray],
+                #    'dimension': {
+                #        'length': 1
+                #    }
+                #    })
+                #    primitive.init_kwargs['sampling_rate'] = int(sampling_rate)
+                #    executable = self.instantiate_primitive(primitive)
+                #    if executable is None:
+                #        primitive.finished = True
+                #        print('#####VariableFileType.AUDIO')
+                #        return None
+                #    #executable.fit('time_series', [audio_clip])
+                #    features = executable.produce(inputs=audio).value
+                #    allfeatures = {}
+                #    print('***',features,'***')
+                #    for feature in features:
+                #        for index in range(0, len(feature)):
+                #            fcol = col.format() + "_" + str(index)
+                #            featurevals = allfeatures.get(fcol, [])
+                #            featurevals.append(feature[index])
+                #            allfeatures[fcol] = featurevals
 
-                    allfeatures = {}
-                    for feature in features:
-                        for index in range(0, len(feature)):
-                            fcol = col.format() + "_" + str(index)
-                            featurevals = allfeatures.get(fcol, [])
-                            featurevals.append(feature[index])
-                            allfeatures[fcol] = featurevals
-
-                    for fcol in allfeatures.keys():
-                        if df.get(fcol) is None:
-                            fcols.append(fcol)
-                            df.set_value(idx, fcol, 0)
-                            #df[fcol] = df[fcol].astype(object)
-                        df.set_value(idx, fcol, np.average(allfeatures[fcol]))
+                #    for fcol in allfeatures.keys():
+                #        if df.get(fcol) is None:
+                #            fcols.append(fcol)
+                #            df.set_value(idx, fcol, 0)
+                #            #df[fcol] = df[fcol].astype(object)
+                #        df.set_value(idx, fcol, np.average(allfeatures[fcol]))
 
                 del df[col]
                 '''
@@ -430,7 +449,6 @@ class ExecutionHelper(object):
         primitive.progress = 1.0
         primitive.finished = True
         primitive.pipeline.notifyChanges()
-
         return pd.DataFrame(df, index=indices)
 
     @stopit.threading_timeoutable()
@@ -478,32 +496,40 @@ class ExecutionHelper(object):
                 df = pd.concat([df, newdf], axis=1)
                 df.columns=ncols
             elif self.data_manager.media_type == VariableFileType.AUDIO:
+                if executable is None:
+                    primitive.finished = True
+                executable = self.instantiate_primitive(primitive)
+                features = executable.produce(inputs=df).value
+                print('###########print len of features/features[0] (in featurise)###############')
+                print(len(features))
+                print(features[0])
+                print('###########################################################################')
                 # Featurize audio
-                fcols = []
-                for idx, row in df.iterrows():
-                    if row[col] is None:
-                        continue
-                    (audio_clip, sampling_rate) = row[col]
-                    primitive.init_kwargs['sampling_rate'] = sampling_rate
-                    executable = self.instantiate_primitive(primitive)
-                    if executable is None:
-                        return None
-                    features = executable.produce([audio_clip])[0]
+                #fcols = []
+                #for idx, row in df.iterrows():
+                #    if row[col] is None:
+                #        continue
+                #    (audio_clip, sampling_rate) = row[col]
+                #    primitive.init_kwargs['sampling_rate'] = sampling_rate
+                #    executable = self.instantiate_primitive(primitive)
+                #    if executable is None:
+                #        return None
+                #    features = executable.produce([audio_clip])[0]
 
-                    allfeatures = {}
-                    for feature in features:
-                        for i in range(0, len(feature)):
-                            fcol = col.format() + "_" + str(i)
-                            featurevals = allfeatures.get(fcol, [])
-                            featurevals.append(feature[i])
-                            allfeatures[fcol] = featurevals
+                #    allfeatures = {}
+                #    for feature in features:
+                #        for i in range(0, len(feature)):
+                #            fcol = col.format() + "_" + str(i)
+                #            featurevals = allfeatures.get(fcol, [])
+                #            featurevals.append(feature[i])
+                #            allfeatures[fcol] = featurevals
 
-                    for fcol in allfeatures.keys():
-                        if df.get(fcol) is None:
-                            fcols.append(fcol)
-                            df.set_value(idx, fcol, 0)
-                            #df[fcol] = df[fcol].astype(object)
-                        df.set_value(idx, fcol, np.average(allfeatures[fcol]))
+                #    for fcol in allfeatures.keys():
+                #        if df.get(fcol) is None:
+                #            fcols.append(fcol)
+                #            df.set_value(idx, fcol, 0)
+                #            #df[fcol] = df[fcol].astype(object)
+                #        df.set_value(idx, fcol, np.average(allfeatures[fcol]))
 
                 del df[col]
                 '''

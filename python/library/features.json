@@ -53,14 +53,13 @@
     "Effects": []
   },
   {
-    "Class": "spider.featurization.audio_featurization.AudioFeaturization",
+    "Class": "dsbox.custom_primitives.feature.audio_feature.AudioFeaturization",
     "Name": "AudioFeaturization",
     "Task": "FeatureExtraction",
     "RequiresColumnData": true,
-    "InitKeywordArguments": {"frame_length":0.20, "overlap":0.10},
     "NotPersistent": true,
     "Requirements": [],
-    "Effects": ["MISSING_VALUES"]
+    "Effects": []
   },
   {
     "Class": "dsbox.custom_primitives.feature.timeseries_feature.RandomProjectionTimeSeriesFeaturization",
