@@ -1,5 +1,6 @@
 import abc
 import bisect
+import math
 import operator
 import random
 import traceback
@@ -38,7 +39,7 @@ class DimensionalSearch(typing.Generic[T]):
         If True, minimize the value returned by `evaluate` function
     """
 
-    def __init__(self, evaluate: typing.Callable[[ConfigurationPoint[T]], typing.Tuple[float, dict]],
+    def __init__(self, evaluate: typing.Callable[[typing.List[ConfigurationPoint[T]]], typing.List[typing.Tuple[float, dict]]],
                  configuration_space: ConfigurationSpace[T], minimize: bool) -> None:
         self.evaluate = evaluate
         self.configuration_space = configuration_space
@@ -83,21 +84,21 @@ class DimensionalSearch(typing.Generic[T]):
         max_per_dimension: int
             Maximunum number of values to search per dimension
         """
+
         if candidate is None:
-            candidate = ConfigurationPoint(
-                self.configuration_space, self.first_assignment())
-# first, then random, then another random
-        try:
-            result = self.evaluate(candidate)
-        except:
-            print("***************")
-            print("Pipeline failed", candidate)
-            candidate = ConfigurationPoint(self.configuration_space, self.random_assignment())
+            # Try first, then random, then another random
+            candidate = ConfigurationPoint(self.configuration_space, self.first_assignment())
             try:
-                result = self.evaluate(candidate)
+                result = self.evaluate([candidate])
             except:
+                print("***************")
                 print("Pipeline failed", candidate)
                 candidate = ConfigurationPoint(self.configuration_space, self.random_assignment())
+                try:
+                    result = self.evaluate([candidate])
+                except:
+                    print("Pipeline failed", candidate)
+                    candidate = ConfigurationPoint(self.configuration_space, self.random_assignment())
 
         for dimension in self.dimension_ordering:
             choices: typing.List[T] = self.configuration_space.get_values(dimension)
@@ -115,16 +116,15 @@ class DimensionalSearch(typing.Generic[T]):
                 new = dict(candidate)
                 new[dimension] = value
                 new_candidates.append(self.configuration_space.get_point(new))
-            values = []
+
+
+            results = self.evaluate(new_candidates)
+
             sucessful_candidates = []
-            for x in new_candidates:
-                try:
-                    result = self.evaluate(x)
-                    values.append(result[0])
-                    sucessful_candidates.append(x)
-                except:
-                    print('Pipeline failed: ', x)
-                    traceback.print_exc()
+            for candidate, (val, data) in zip(new_candidates, results):
+                if not math.isnan(val):
+                    sucessful_candidates.append(candidate)
+                    values.append((val,data))
 
             # All primitives failed
             if len(values) == 0:
@@ -137,6 +137,30 @@ class DimensionalSearch(typing.Generic[T]):
             elif (self.minimize and values[best_index] < candidate_value) or (not self.minimize and values[best_index] > candidate_value):
                 candidate = sucessful_candidates[best_index]
                 candidate_value = values[best_index]
+
+            # values = []
+            # sucessful_candidates = []
+            # for x in new_candidates:
+            #     try:
+            #         result = self.evaluate(x)
+            #         values.append(result[0])
+            #         sucessful_candidates.append(x)
+            #     except:
+            #         print('Pipeline failed: ', x)
+            #         traceback.print_exc()
+
+            # # All primitives failed
+            # if len(values) == 0:
+            #     return (None, None)
+
+            # best_index = values.index(min(values))
+            # if candidate_value is None:
+            #     candidate = sucessful_candidates[best_index]
+            #     candidate_value = values[best_index]
+            # elif (self.minimize and values[best_index] < candidate_value) or (not self.minimize and values[best_index] > candidate_value):
+            #     candidate = sucessful_candidates[best_index]
+            #     candidate_value = values[best_index]
+
         # here we can get the details of pipelines from "candidate.data"
         return (candidate, candidate_value)
 
@@ -201,11 +225,25 @@ class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
         #     raise exceptions.InvalidArgumentValueError(
         #         "Not all template steps are in configuration space: {}".format(self.template.template_nodes.keys()))
 
-    def evaluate_pipeline(self, configuration: ConfigurationPoint[PrimitiveDescription]) -> typing.Tuple[float, dict]:
+    def evaluate_pipeline(self, points: typing.List[ConfigurationPoint[PrimitiveDescription]]) -> typing.List[typing.Tuple[float, dict]]:
         """
         Evaluate at configuration point.
         Note: This methods will modify the configuration point, by updating its data field.
         """
+
+        pipelines = [self.template.to_pipeline(pt) for pt in points]
+        fitted_pipelines, tasks = dsbox_runtime.fit(pipelines, self.train_dataset)
+
+        for i, fitted in enumerate(fitted_pipelines):
+            if fitted.cancel() or fitted.exception is not None:
+                
+            
+
+        dsbox_runtime.produce(pipelines, self.validation_dataset)
+        
+        # TODO: compute errors
+
+        
 
         # convert PrimitiveDescription to primitive metadata
         # metadata_configuration: typing.Dict[DimensionName, PrimitiveMetadata] = {

@@ -77,11 +77,8 @@ def split_dataset(dataset, problem, *, randome_state=42, test_size=0.2):
     print(meta)
     test_dataset.metadata = test_dataset.metadata.update((res_id,), meta)
     pprint.pprint(dict(test_dataset.metadata.query((res_id,))))
-    
 
     return (train_dataset, test_dataset)
-
-    
 
 class Status(enum.Enum):
     OK = 0
@@ -217,7 +214,7 @@ class Controller:
             exec_pipelines.append(pipeline_load)
 
 
-        print("[INFO] wtr:",exec_pipelines)
+        print("[INFO] wtr:", exec_pipelines)
         # sort the pipelins
         # TODO add the sorter method
         # self.exec_pipelines = self.get_pipeline_sorter().sort_pipelines(self.exec_pipelines)
