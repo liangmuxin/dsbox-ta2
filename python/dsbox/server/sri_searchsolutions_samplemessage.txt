@@ -1,0 +1,179 @@
+distil_1    | [ Jun 13 13:48:30 ] [ INFO ] GRPC.UNARY /Core/SearchSolutions/user_agent: "uncharted-distil-115c3d7-2018-06-11T17:36:25+0000"
+distil_1    | version: "2018.6.2"
+distil_1    | allowed_value_types: DATASET_URI
+distil_1    | problem: <
+distil_1    |   problem: <
+distil_1    |     task_type: REGRESSION
+distil_1    |     performance_metrics: <
+distil_1    |       metric: R_SQUARED
+distil_1    |     >
+distil_1    |   >
+distil_1    |   inputs: <
+distil_1    |     dataset_id: "d_185_bl_dataset_TRAIN"
+distil_1    |     targets: <
+distil_1    |       target_index: 17
+distil_1    |       resource_id: "0"
+distil_1    |       column_index: 17
+distil_1    |       column_name: "Hall_of_Fame"
+distil_1    |     >
+distil_1    |   >
+distil_1    | >
+distil_1    | template: <
+distil_1    |   name: "preprocessing-d_185_bl_dataset_TRAIN-037683c7-428b-4b99-a766-bbc74fb16ffd"
+distil_1    |   description: "Preprocessing pipeline capturing user feature selection and type information. Dataset: `d_185_bl_dataset_TRAIN` ID: `037683c7-428b-4b99-a766-bbc74fb16ffd`"
+distil_1    |   outputs: <
+distil_1    |     data: "steps.3.produce"
+distil_1    |   >
+distil_1    |   steps: <
+distil_1    |     primitive: <
+distil_1    |       primitive: <
+distil_1    |         id: "4b42ce1e-9b98-4a25-b68e-fad13311eb65"
+distil_1    |         version: "0.2.0"
+distil_1    |         python_path: "d3m.primitives.datasets.DatasetToDataFrame"
+distil_1    |         name: "Dataset to DataFrame converter"
+distil_1    |       >
+distil_1    |       arguments: <
+distil_1    |         key: "inputs"
+distil_1    |         value: <
+distil_1    |           container: <
+distil_1    |             data: "inputs.0"
+distil_1    |           >
+distil_1    |         >
+distil_1    |       >
+distil_1    |       outputs: <
+distil_1    |         id: "produce"
+distil_1    |       >
+distil_1    |     >
+distil_1    |   >
+distil_1    |   steps: <
+distil_1    |     primitive: <
+distil_1    |       primitive: <
+distil_1    |         id: "2eeff053-395a-497d-88db-7374c27812e6"
+distil_1    |         version: "0.1.0"
+distil_1    |         python_path: "d3m.primitives.datasets.RemoveColumns"
+distil_1    |         name: "Column remover"
+distil_1    |       >
+distil_1    |       arguments: <
+distil_1    |         key: "inputs"
+distil_1    |         value: <
+distil_1    |           container: <
+distil_1    |             data: "steps.0.produce"
+distil_1    |           >
+distil_1    |         >
+distil_1    |       >
+distil_1    |       outputs: <
+distil_1    |         id: "produce"
+distil_1    |       >
+distil_1    |       hyperparams: <
+distil_1    |         key: "colNames"
+distil_1    |         value: <
+distil_1    |           value: <
+distil_1    |             data: <
+distil_1    |               string_list: <
+distil_1    |               >
+distil_1    |             >
+distil_1    |           >
+distil_1    |         >
+distil_1    |       >
+distil_1    |     >
+distil_1    |   >
+distil_1    |   steps: <
+distil_1    |     primitive: <
+distil_1    |       primitive: <
+distil_1    |         id: "98c79128-555a-4a6b-85fb-d4f4064c94ab"
+distil_1    |         version: "0.1.0"
+distil_1    |         python_path: "d3m.primitives.datasets.UpdateSemanticTypes"
+distil_1    |         name: "Semantic type updater"
+distil_1    |       >
+distil_1    |       arguments: <
+distil_1    |         key: "inputs"
+distil_1    |         value: <
+distil_1    |           container: <
+distil_1    |             data: "steps.1.produce"
+distil_1    |           >
+distil_1    |         >
+distil_1    |       >
+distil_1    |       outputs: <
+distil_1    |         id: "produce"
+distil_1    |       >
+distil_1    |       hyperparams: <
+distil_1    |         key: "add_columns"
+distil_1    |         value: <
+distil_1    |           value: <
+distil_1    |             data: <
+distil_1    |               string_list: <
+distil_1    |                 list: "Player"
+distil_1    |                 list: "Strikeouts"
+distil_1    |                 list: "Position"
+distil_1    |                 list: "Hall_of_Fame"
+distil_1    |                 list: "Hall_of_Fame"
+distil_1    |               >
+distil_1    |             >
+distil_1    |           >
+distil_1    |         >
+distil_1    |       >
+distil_1    |       hyperparams: <
+distil_1    |         key: "add_types"
+distil_1    |         value: <
+distil_1    |           value: <
+distil_1    |             data: <
+distil_1    |               string_list: <
+distil_1    |                 list: "http://schema.org/Text"
+distil_1    |                 list: "http://schema.org/Float"
+distil_1    |                 list: "http://schema.org/Text"
+distil_1    |                 list: "http://schema.org/Integer"
+distil_1    |                 list: "https://metadata.datadrivendiscovery.org/types/Target"
+distil_1    |               >
+distil_1    |             >
+distil_1    |           >
+distil_1    |         >
+distil_1    |       >
+distil_1    |       hyperparams: <
+distil_1    |         key: "remove_columns"
+distil_1    |         value: <
+distil_1    |           value: <
+distil_1    |             data: <
+distil_1    |               string_list: <
+distil_1    |                 list: "Player"
+distil_1    |                 list: "Strikeouts"
+distil_1    |                 list: "Position"
+distil_1    |                 list: "Hall_of_Fame"
+distil_1    |               >
+distil_1    |             >
+distil_1    |           >
+distil_1    |         >
+distil_1    |       >
+distil_1    |       hyperparams: <
+distil_1    |         key: "remove_types"
+distil_1    |         value: <
+distil_1    |           value: <
+distil_1    |             data: <
+distil_1    |               string_list: <
+distil_1    |                 list: "https://metadata.datadrivendiscovery.org/types/CategoricalData"
+distil_1    |                 list: "http://schema.org/Integer"
+distil_1    |                 list: "https://metadata.datadrivendiscovery.org/types/CategoricalData"
+distil_1    |                 list: "https://metadata.datadrivendiscovery.org/types/CategoricalData"
+distil_1    |               >
+distil_1    |             >
+distil_1    |           >
+distil_1    |         >
+distil_1    |       >
+distil_1    |     >
+distil_1    |   >
+distil_1    |   steps: <
+distil_1    |     placeholder: <
+distil_1    |       inputs: <
+distil_1    |         data: "steps.2.produce"
+distil_1    |       >
+distil_1    |       outputs: <
+distil_1    |         id: "produce"
+distil_1    |       >
+distil_1    |     >
+distil_1    |   >
+distil_1    | >
+distil_1    | inputs: <
+distil_1    |   dataset_uri: "/datasets/7818287662347669637/datasetDoc.json"
+distil_1    | >
+
+sri-tpot_1  | 2018-06-13 13:48:30,569 [INFO] ta2_servicer --     | SearchSolutions invoked
+sri-tpot_1  | 2018-06-13 13:48:30,569 [INFO] ta2_servicer --     \_____________
