@@ -3,6 +3,9 @@ import functools
 import os
 import sys
 import time
+import traceback
+
+from concurrent.futures import Future, ProcessPoolExecutor
 
 path = os.path.abspath('../..')
 print('Add to python path: ', path)
@@ -14,34 +17,58 @@ import dsbox.controller.dsbox_runtime
 reload(dsbox.controller.dsbox_runtime)
 from dsbox.controller.dsbox_runtime import ProcessExecutorQueue
 
+async def stop(loop):
+    await asyncio.sleep(10)
+    print('stop')
+    loop.stop()
+
 def run_pipeline(id, timeout=5):
-    print('run_pipeline {} start'.format(id))
+    print('Pipeline {} start'.format(id))
     time.sleep(timeout)
-    print('run_pipeline {} done'.format(id))
+    if timeout==2:
+        raise ValueError('EXCEPTION run_pipeline {}'.format(id))
+    print('PIPELINE {} done'.format(id))
     return ('pipeline {} done'.format(id))
 
-loop = asyncio.get_event_loop()
 async def run():
+    print('Starting...')
     executor_queue = ProcessExecutorQueue(loop)
     t1 = executor_queue.run(functools.partial(run_pipeline, 1, timeout=3))
     t2 = executor_queue.run(functools.partial(run_pipeline, 2, timeout=2))
     t3 = executor_queue.run(functools.partial(run_pipeline, 3, timeout=1))
 
-    # give the task some time to run
-    done, pending = await asyncio.wait([t1, t2, t3], timeout=1)
-    print('done, pending', len(done), len(pending))
-    print('# running tasks', executor_queue.running_task_size())
-    print('# done    tasks', executor_queue.done_task_size())
-    while executor_queue.all_task_size() > 0:
-        result = await executor_queue.get()
-        print('# running tasks', executor_queue.running_task_size())
-        print('# done    tasks', executor_queue.done_task_size())
-        print('got_task: ', type(result), result, result)
-        await asyncio.sleep(1)
-    print('run done')
+    t1.cancel()
+
+    while executor_queue.has_more_tasks():
+        task = await executor_queue.get()
+        print('Got a pipeline result')
+        try:
+            if task.done() and not task.cancelled():
+                if task.exception() is None:
+                    print('  Result = {}'.format(task.result()))
+                else:
+                    print('  Exception="{}"'.format(task.exception()))
+            else:
+                print('  Status done={} cancelled={}'.format(task.done(), task.cancelled()))
+        except Exception:
+            #print('Exception:', e)
+            #traceback.print_exc()
+            traceback.print_exc(file=sys.stdout)
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            traceback.print_tb(exc_traceback)
+            
+    print('Ending...')
+    return [t1, t2, t3]
+
+
+print()
+
+loop = asyncio.get_event_loop()
+#loop.set_debug(True)
 
 task = loop.create_task(run())
+
+loop.create_task(stop(loop))
 loop.run_forever()
-#loop.run_until_complete(asyncio.wait([task]))
-loop.close()
+print(task.exception())
 
