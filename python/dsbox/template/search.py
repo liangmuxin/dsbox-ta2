@@ -95,29 +95,11 @@ class DimensionalSearch(typing.Generic[T]):
         max_per_dimension: int
             Maximunum number of values to search per dimension
         """
-<<<<<<< HEAD
-
-        if candidate is None:
-            # Try first, then random, then another random
-            candidate = ConfigurationPoint(self.configuration_space, self.first_assignment())
-            try:
-                result = self.evaluate([candidate])
-            except:
-                print("***************")
-                print("Pipeline failed", candidate)
-                candidate = ConfigurationPoint(self.configuration_space, self.random_assignment())
-                try:
-                    result = self.evaluate([candidate])
-                except:
-                    print("Pipeline failed", candidate)
-                    candidate = ConfigurationPoint(self.configuration_space, self.random_assignment())
-=======
         # we first need the baseline for searching the conf_space. For this
         # purpose we initially use first configuration and evaluate it on the
         #  dataset. In case that failed we repeat the sampling process one
         # more time to guarantee robustness on error reporting
         candidate, candidate_value = self.setup_initial_candidate(candidate_in)
->>>>>>> template
 
         # generate an executable pipeline with random steps from conf. space.
 
@@ -152,30 +134,18 @@ class DimensionalSearch(typing.Generic[T]):
                 new[dimension] = value
                 new_candidates.append(self.configuration_space.get_point(new))
 
-<<<<<<< HEAD
-
-            results = self.evaluate(new_candidates)
-
-            sucessful_candidates = []
-            for candidate, (val, data) in zip(new_candidates, results):
-                if not math.isnan(val):
-                    sucessful_candidates.append(candidate)
-                    values.append((val,data))
-=======
             values = []
             sucessful_candidates = []
             for x in new_candidates:
                 try:
                     result = self.evaluate(x)
-                    values.append(result[0])
-                    sucessful_candidates.append(x)
-                    # print("[INFO] Results:")
-                    # pprint(result)
-                    # pprint(result[0])
+                    val, data  = result
+                    if not math.isnan(val):
+                        values.append((val, data))
+                        sucessful_candidates.append(x)
                 except:
                     # print('Pipeline failed: ', x)
                     traceback.print_exc()
->>>>>>> template
 
             # All candidates failed!
             if len(values) == 0:
