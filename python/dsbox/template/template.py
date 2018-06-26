@@ -1,11 +1,12 @@
 import datetime
 import typing
 import uuid
-
+import numpy as np
 import dateparser  # type: ignore
 import jsonpath_ng  # type: ignore
-
+import pprint
 from networkx import nx  # type: ignore
+import copy
 
 from d3m import exceptions, utils, index
 from d3m.metadata.base import PrimitiveMetadata
@@ -14,6 +15,9 @@ from d3m.primitive_interfaces.base import PrimitiveBaseMeta
 from .configuration_space import DimensionName, ConfigurationSpace, SimpleConfigurationSpace, ConfigurationPoint
 # from dsbox.template.search import TemplateDimensionalRandomHyperparameterSearch, TemplateDimensionalSearch, ConfigurationSpace, SimpleConfigurationSpace, PythonPath, DimensionName
 # Define separate extended pipe step enum, because Python cannot extend Enum
+
+from itertools import zip_longest, product
+from pprint import pprint
 
 
 class ExtendedPipelineStep(utils.Enum):
@@ -308,108 +312,246 @@ class DSBoxTemplate():
             "value": ArgumentType.VALUE,
             "primitive": ArgumentType.PRIMITIVE
         }
+        self.stepcheck = None  # Generate a step check matrix
 
         self.step_number = {}
+        self.addstep_mapper = {
+            ("<class 'd3m.container.pandas.DataFrame'>", "<class 'd3m.container.numpy.ndarray'>"): "d3m.primitives.datasets.DataFrameToNDArray",
+            # ("<class 'd3m.container.pandas.DataFrame'>", "<class 'd3m.container.numpy.ndarray'>"): "d3m.primitives.sklearn_wrap.SKImputer",
+            ("<class 'd3m.container.numpy.ndarray'>", "<class 'd3m.container.pandas.DataFrame'>"): "d3m.primitives.datasets.NDArrayToDataFrame"
+        }
 
         # Need to be set by subclass inheriting DSBoxTemplate
         # self.template = ""
 
+    def add_stepcheck(self):
+        check = np.zeros(shape=(len(self.primitive), len(self.primitive))).astype(int)
+        for i, v in enumerate(self.primitive.keys()):
+            inputs = self.primitive[v].metadata.query()["primitive_code"]["class_type_arguments"]["Inputs"]
+            for j, u in enumerate(self.primitive.keys()):
+                outputs = self.primitive[u].metadata.query()["primitive_code"]["class_type_arguments"]["Outputs"]
+                try:
+                    inp = inputs.__args__
+                    if outputs in inp:
+                        check[i][j] = 1
+                except:
+                    if inputs == outputs:
+                        check[i][j] = 1
+        self.stepcheck = check
+
     def to_pipeline(self, configuration_point: ConfigurationPoint) -> Pipeline:
+        """
+        converts the configuration point to the executable pipeline based on
+        ta2 competitions format
+        Args:
+            configuration_point (ConfigurationPoint):
 
-        # configuration_point =
-        # {
-        #     "my_step1" : {
-        #         "primitive": "dsbox.a.b",
-        #         "hyperparameters": {
-        #             "x": 1
-        #         }
-        #     },
-        #     "my_step2" : {
-        #         "primitive": "sklearn.a.b",
-        #         "hyperparameters": {}
-        #     }
-        # }
+        Returns:
+            The executable pipeline with full hyperparameter settings
 
-        # do reasoning
+        Examples:
+            configuration_point =
+            {
+                "my_step1" : {
+                    "primitive": "dsbox.a.b",
+                    "hyperparameters": {
+                        "x": 1
+                    }
+                },
+                "my_step2" : {
+                    "primitive": "sklearn.a.b",
+                    "hyperparameters": {}
+                }
+            }
+            dstemp = DSBoxTemplate(...)
+            dstemp.to_pipeline(configuration_point)
+        """
+        print("*" * 20)
+        # print("[INFO] to_pipeline:")
+        # pprint(configuration_point)
+        # return self._to_pipeline(configuration_point)
+
+        # add inputs to the configuration point
+        ioconf = self.add_inputs_to_confPonit(configuration_point)
+        # pprint(ioconf)
+
+        # binding = configuration_point
+        binding, sequence = self.add_intermediate_type_casting(ioconf)
+        print("[INFO] Binding:")
+        # pprint(binding)
+        return self._to_pipeline(binding, sequence)
+
+    def add_inputs_to_confPonit(
+            self, configuration_point: ConfigurationPoint) \
+            -> ConfigurationPoint:
+        io_conf = copy.deepcopy(configuration_point)
+        for step in self.template['steps']:
+            io_conf[step['name']]['inputs'] = step['inputs']
+
+        return io_conf
+
+    def add_intermediate_type_casting(
+            self, configuration_point: ConfigurationPoint) \
+            -> ConfigurationPoint:
+        """
+        This method parses the information in the template and adds the
+        necessary type casting primitives in the pipeline. These type
+        information is associated with each individual primitive present in
+        the template and is governed by d3m's primitive rules.
+        Args:
+            configuration_point: Configuration
+
+        Returns:
+            binding: Configuration
+
+        """
         # binding = ....
-        binding = {}
+        binding = configuration_point
+        checked_binding = {}
+        sequence = []
+        # for step in self.template["steps"]:
         for step in self.template["steps"]:
-            sub_steps = []
-            if len(step['primitives']) == 1:
-                if isinstance(step['primitives'][0], str):
-                    sub_step = {
-                        'primitive' : step['primitives'][0],
-                        'hyperparameters': {}
-                    }
-                else:
-                    # is dict
-                    sub_step = {
-                        'primitive' : step['primitives'][0]['primitive'],
-                        'hyperparameters' : step['primitives'][0]['hyperpameters']
-                    }
-                    
-                sub_steps.append(sub_step)
-            else:
-                sub_steps.append(configuration_point[step["name"]])
-            binding[step["name"]] = sub_steps
-        return self._to_pipeline(binding)
+            # First element in the inputs array is always the input of the
+            # step in configuration point. In order to check the need for
+            # adding intermediate step we first extract metadata information
+            # of steps and by comparing the IO type information we decide on
+            # whether intermediate type caster is necessary or not
 
-    def _to_pipeline(self, binding) -> Pipeline:
-        # binding =
-        # {
-        #     "my_step1" : [
-        #         {
-        #             "primitive": "dsbox.c.d",
-        #             "hyperparameters": {
-        #                 "y": 3
-        #             }
-        #         },
-        #         {
-        #             "primitive": "dsbox.a.b",
-        #             "hyperparameters": {
-        #                 "x": 1
-        #             }
-        #         }
-        #     ]
-        #     ,
-        #     "my_step2" : [
-        #         {
-        #             "primitive": "sklearn.a.b",
-        #             "hyperparameters": {}
-        #         }
-        #     ]
-        # }
-        pipeline = Pipeline(name="Helloworld", context='PRETRAINING')  # generate empty pipeline with i/o/s/u =[]
+            inputs = step["inputs"]
+            fill_in = copy.deepcopy(inputs)
+            name = step["name"]
+            for in_arg in inputs:
+                in_primitive_value = \
+                    self.primitive[binding[name]["primitive"]].metadata.query()[
+                        "primitive_code"]["class_type_arguments"]["Inputs"]
+                if in_arg == "template_input":
+                    continue
+
+                # Check if the input name is valid and available in template
+                if in_arg not in binding:
+                    print("[ERROR] step {i} is not available!")
+                    return 1
+
+                # get information of the producer of the input
+                out_primitive_value = \
+                    self.primitive[binding[in_arg]["primitive"]].metadata.query()[
+                        "primitive_code"]["class_type_arguments"]["Outputs"]
+                if not self.iocompare(in_primitive_value,
+                                      out_primitive_value):
+                    check_key = (str(out_primitive_value),
+                                 str(in_primitive_value))
+                    print("[INFO] Different types!")
+                    try:
+                        # inter_name = "{}_{}_{}".format(name,in_arg,solution)
+                        solution = self.addstep_mapper[check_key]
+                        inter_name = "{}_{}_{}".format(name, in_arg, solution)
+                        intermediate_step = {
+                            "primitive": solution,
+                            "hyperparameters": {},
+                            "inputs": [in_arg]
+                        }
+                        # binding[inter_name] = intermediate_step
+                        # binding[name]['inputs'][0] = inter_name
+                        # checked_binding[inter_name] = intermediate_step
+                        pos = binding[name]["inputs"].index(in_arg)
+                        # checked_binding[name]["inputs"][pos] = inter_name
+                        checked_binding[inter_name] = intermediate_step
+                        fill_in[pos] = in_arg
+                        sequence.append(inter_name)
+                        print("[INFO] ", solution, "added to step",
+                              name)
+                    except:
+                        print("Warning!", name,
+                              "'s primitive",
+                              conf_step[-1]["primitive"],
+                              "'s inputs does not match",
+                              binding[in_arg][-1]["primitive"],
+                              "and there is no converter found")
+            mystep = {
+                "primitive": binding[name]["primitive"],
+                "hyperparameters": binding[name]["hyperparameters"],
+                "inputs": fill_in
+            }
+            sequence.append(name)
+            checked_binding[name] = mystep
+
+        return checked_binding, sequence
+
+    def iocompare(self, i, o):
+        try:
+            i = i.__args__
+            if o in i:
+                return True
+        except:
+            if o == i:
+                return True
+        return False
+
+    def bind_primitive_IO(self, primitive, *templateIO):
+        print(templateIO)
+        if len(templateIO) > 0:
+            primitive.add_argument(
+                name="inputs",
+                argument_type=ArgumentType.CONTAINER,
+                data_reference=templateIO[0])
+        if len(templateIO) > 1:
+            primitive.add_argument("outputs", ArgumentType.CONTAINER,
+                                   templateIO[1])
+        if len(templateIO) > 2:
+            raise exceptions.InvalidArgumentValueError(
+                "Should be less than 3 arguments!")
+
+    def _to_pipeline(self, binding, sequence) -> Pipeline:
+        """
+        Args:
+            binding:
+
+        Returns:
+
+        """
+
+        # define an empty pipeline with the general dataset input primitive
+        # generate empty pipeline with i/o/s/u =[]
+        pprint(binding)
+        print(sequence)
+        pipeline = Pipeline(name="dsbox_" + str(id(binding)),
+                            context='PRETRAINING')
         templateinput = pipeline.add_input("input dataset")
-        outputs = {}  # save temporary output for another step to take as input
-        for index, k in enumerate(self.template["steps"]):
-            name = k["name"]
-            self.step_number[name] = index
-            for v in binding[name]:
-                primitiveStep = PrimitiveStep(self.primitive[v["primitive"]].metadata.query())
-                pipeline.add_step(primitiveStep)
-                outputs[name] = primitiveStep.add_output("produce")
-                if v["hyperparameters"] != {}:
-                    hyper = v["hyperparameters"]
-                    for n in hyper.keys():
-                        # print(n, ArgumentType.VALUE, hyper[n]["value"])
-                        primitiveStep.add_hyperparameter(n, self.argmentsmapper[hyper[n]["type"]], hyper[n]["value"])
-                        # print(primitiveStep.hyperparams)
-                    # pass
-                if len(k["inputs"]) == 1:
-                    for i in k["inputs"]:
-                        if i == "template_input":
-                            primitiveStep.add_argument("inputs", ArgumentType.CONTAINER, templateinput)
-                        else:
-                            primitiveStep.add_argument("inputs", ArgumentType.CONTAINER, outputs[i])
-                elif len(k["inputs"]) == 2:
-                    primitiveStep.add_argument("inputs", ArgumentType.CONTAINER, outputs[k["inputs"][0]])
-                    primitiveStep.add_argument("outputs", ArgumentType.CONTAINER, outputs[k["inputs"][1]])
-                else:
-                    raise exceptions.InvalidArgumentValueError("Should be less than 3 arguments!")
 
+        # save temporary output for another step to take as input
+        outputs = {}
+        outputs["template_input"] = templateinput
+
+        # iterate through steps in the given binding and add each step to the
+        #  pipeline. The IO and hyperparameter are also handled here.
+        for i, step in enumerate(sequence):
+            self.step_number[step] = i
+            primitive_step = PrimitiveStep(self.primitive[binding[step]["primitive"]].metadata.query())
+            pipeline.add_step(primitive_step)
+            outputs[step] = primitive_step.add_output("produce")
+            if binding[step]["hyperparameters"] != {}:
+                hyper = binding[step]["hyperparameters"]
+                for hyperName in hyper:
+                    primitive_step.add_hyperparameter(
+                        name=hyperName, argument_type=type(hyper[hyperName]),
+                        data=hyper[hyperName])
+            templateIO = binding[step]["inputs"]
+
+            # first we need to extract the types of the primtive's input and
+            # the generators's output type.
+            # then we need to compare those and in case we have different
+            # types, add the intermediate type caster in the pipeline
+            # print(outputs)
+            self.bind_primitive_IO(primitive_step,
+                                   *map(lambda io: outputs[io], templateIO))
+
+        # END FOR
+
+        # Add final output as the prediction of target attribute
         general_output = outputs[self.template["steps"][-1]["name"]]
+        # print(general_output)
         pipeline.add_output(general_output, "predictions of input dataset")
+
         return pipeline
 
     def generate_configuration_space(self) -> SimpleConfigurationSpace:
@@ -418,21 +560,48 @@ class DSBoxTemplate():
         for s in steps:
             name = s["name"]
             values = []
+
+            # description: typing.Dict
             for description in s["primitives"]:
                 if isinstance(description, str):
-                    value = {
-                        "primitive" : description,
-                        "hyperparameters" : {}
-                    }
+                    value = [{
+                        "primitive": description,
+                        "hyperparameters": {}
+                    }]
+                elif isinstance(description, list):
+                    # list of primitives with default hypers
+                    value = []
+                    for prim in description:
+                        value.append({
+                            "primitive": prim,
+                            "hyperparameters": {}
+                        })
                 else:
-                    # value is a dict = {"primitive": "dsbox.a.b", "hyperparameters": {}"
-                    value = {
-                        "primitive" : description["primitive"],
-                        "hyperparameters" : description["hyperparameters"],
-                        }
-                values.append(value)
-            if len(values) > 1:
+                    if isinstance(description, dict):
+                        description = [description]
+
+                        # print("description:", description )
+
+                        # value is a list of dicts = [{"primitive": sth,
+                        #                    "hyperparameters": {}}]"
+                        # iterate through all options for hypP of the primitive
+                    value = []
+                    for desc in description:
+                        if "hyperparameters" not in desc:
+                            desc["hyperparameters"] = {}
+
+                        for hyper in _product_dict(desc["hyperparameters"]):
+                            value.append({
+                                "primitive": desc["primitive"],
+                                "hyperparameters": hyper,
+                            })
+
+                # END
+                values += value
+            # END FOR
+            if len(values) > 0:
                 conf_space[name] = values
+        # END FOR
         return SimpleConfigurationSpace(conf_space)
 
     def get_target_step_number(self):
@@ -440,3 +609,10 @@ class DSBoxTemplate():
 
     def get_output_step_number(self):
         return self.step_number[self.template['output']]
+
+
+def _product_dict(dct):
+    keys = dct.keys()
+    vals = dct.values()
+    for instance in product(*vals):
+        yield dict(zip(keys, instance))

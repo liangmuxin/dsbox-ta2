@@ -18,20 +18,24 @@ from dsbox.template.search import TemplateDimensionalSearch, ConfigurationSpace,
 from dsbox.template.template import TemplatePipeline, to_digraph, DSBoxTemplate
 from dsbox.pipeline.fitted_pipeline import FittedPipeline
 
+from pathlib import Path
+
 __all__ = ['Status', 'Controller']
 
 import copy
 import pprint
 from sklearn.model_selection import StratifiedShuffleSplit, ShuffleSplit
 
-def split_dataset(dataset, problem, *, randome_state=42, test_size=0.2):
+# FIXME: we only need this for testing
+import pandas as pd
+
+def split_dataset(dataset, problem, problem_loc=None, *, randome_state=42, test_size=0.2):
     '''
     Split dataset into training and test
     '''
 
     task_type : TaskType = problem['problem']['task_type']  # 'classification' 'regression'
 
-    
     for i in range(len(problem['inputs'])):
         if 'targets' in problem['inputs'][i]:
             break
@@ -39,22 +43,40 @@ def split_dataset(dataset, problem, *, randome_state=42, test_size=0.2):
     res_id = problem['inputs'][i]['targets'][0]['resource_id']
     target_index = problem['inputs'][i]['targets'][0]['column_index']
 
-    if task_type == TaskType.CLASSIFICATION:
-        # Use stratified sample to split the dataset
-        sss = StratifiedShuffleSplit(n_splits=1, test_size=test_size, random_state=randome_state)
-        sss.get_n_splits(dataset[res_id], dataset[res_id].iloc[:, target_index])
-        for train_index, test_index in sss.split(dataset[res_id], dataset[res_id].iloc[:, target_index]):
-            train = dataset[res_id].iloc[train_index,:]
-            test = dataset[res_id].iloc[test_index,:]
-    else:
-        # Use random split
-        if not task_type == TaskType.REGRESSION:
-            print('USING Random Split to split task type: {}'.format(task_type))
-        ss = ShuffleSplit(n_splits=1, test_size=test_size, random_state=randome_state)
-        ss.get_n_splits(dataset[res_id])
-        for train_index, test_index in ss.split(dataset[res_id]):
-            train = dataset[res_id].iloc[train_index,:]
-            test = dataset[res_id].iloc[test_index,:]
+    try:
+        splits_file = problem_loc.rsplit("/", 1)[0] + "/dataSplits.csv"
+
+        df = pd.read_csv(splits_file)
+
+        train_test = df[df.columns[1]]
+        train_indices = df[train_test == 'TRAIN'][df.columns[0]]
+        test_indices = df[train_test == 'TEST'][df.columns[0]]
+        
+        train = dataset[res_id].iloc[train_indices]
+        test = dataset[res_id].iloc[test_indices]
+
+        use_test_splits = False
+
+        print("[INFO] Succesfully parsed test data")
+    except:
+        if task_type == TaskType.CLASSIFICATION:
+            # Use stratified sample to split the dataset
+            sss = StratifiedShuffleSplit(n_splits=1, test_size=test_size, random_state=randome_state)
+            sss.get_n_splits(dataset[res_id], dataset[res_id].iloc[:, target_index])
+            for train_index, test_index in sss.split(dataset[res_id], dataset[res_id].iloc[:, target_index]):
+                train = dataset[res_id].iloc[train_index,:]
+                test = dataset[res_id].iloc[test_index,:]
+        else:
+            # Use random split
+            if not task_type == TaskType.REGRESSION:
+                print('USING Random Split to split task type: {}'.format(task_type))
+            ss = ShuffleSplit(n_splits=1, test_size=test_size, random_state=randome_state)
+            ss.get_n_splits(dataset[res_id])
+            for train_index, test_index in ss.split(dataset[res_id]):
+                train = dataset[res_id].iloc[train_index,:]
+                test = dataset[res_id].iloc[test_index,:]
+
+        print("[INFO] Failed test data parse/ using stratified kfold data instead")
 
     # Generate training dataset
     train_dataset = copy.copy(dataset)
@@ -121,7 +143,7 @@ class Controller:
         self.config = config
 
         # Problem
-        self.problem = parse_problem_description(config['problem_schema'])
+        self.problem = parse_problem_description(config['problem_root'])
 
         # Dataset
         loader = D3MDatasetLoader()
@@ -150,7 +172,7 @@ class Controller:
         all_dataset_uri = 'file://{}'.format(json_file)
         self.all_dataset = loader.load(dataset_uri=all_dataset_uri)
 
-        self.dataset, self.test_dataset = split_dataset(self.all_dataset, self.problem)
+        self.dataset, self.test_dataset = split_dataset(self.all_dataset, self.problem, config['problem_schema'])
 
         # path, _ = os.path.split(original_path)
         # data_root, _ =  os.path.split(path)
@@ -254,23 +276,51 @@ class Controller:
 
         # search = TemplateDimensionalSearch(template, space, d3m.index.search(), self.dataset, self.dataset, metrics)
         if self.test_dataset is None:
-            search = TemplateDimensionalSearch(template, space, d3m.index.search(), self.dataset, self.dataset, metrics)
+            search = TemplateDimensionalSearch(
+                template, space, d3m.index.search(), self.dataset,
+                self.dataset, metrics)
         else:
-            search = TemplateDimensionalSearch(template, space, d3m.index.search(), self.dataset, self.test_dataset, metrics)
+            search = TemplateDimensionalSearch(
+                template, space, d3m.index.search(), self.dataset,
+                self.test_dataset, metrics)
 
         candidate, value = search.search_one_iter()
         if candidate is None:
+            print("[ERROR] not candidate!")
             return Status.PROBLEM_NOT_IMPLEMENT
         else:
+            print("******************\n[INFO] Writing results")
             print(candidate.data)
             print(candidate, value)
-            print('Training {} = {}'.format(candidate.data['training_metrics'][0]['metric'].name, candidate.data['training_metrics'][0]['value']))
-            print('Testing  {} = {}'.format(candidate.data['validation_metrics'][0]['metric'].name, candidate.data['validation_metrics'][0]['value']))
+            print('Training {} = {}'.format(
+                candidate.data['training_metrics'][0]['metric'].name,
+                candidate.data['training_metrics'][0]['value']))
+            print('Validation {} = {}'.format(
+                candidate.data['validation_metrics'][0]['metric'].name,
+                candidate.data['validation_metrics'][0]['value']))
 
+            # FIXME: code used for doing experiments, want to make optionals
+            pipeline = FittedPipeline.create(configuration=candidate,
+                                        dataset=self.dataset)
+                                                                           
+            dataset_name = self.config['executables_root'].rsplit("/", 2)[1]
+            save_location = str(Path.home()) + "/outputs/" + dataset_name + ".txt"
 
+            print("******************\n[INFO] Saving training results in", save_location)
+            f = open(save_location, "w+")
+            f.write(str(metrics) + "\n")
+            f.write(str(candidate.data['training_metrics'][0]['value']) + "\n")
+            f.write(str(candidate.data['validation_metrics'][0]['value']) + "\n")
+            f.close()
+
+            print("******************\n[INFO] Saving Best Pipeline")
             # save the pipeline
-            pipeline = FittedPipeline.create(configuration = candidate, dataset = self.dataset)
-            pipeline.save(self.config['executables_root'])
+            try:
+                pipeline = FittedPipeline.create(configuration=candidate,
+                                             dataset=self.dataset)
+                pipeline.save(self.config['executables_root'])
+            except:
+                print("[ERROR] Save Failed!")
 
             return Status.OK
 

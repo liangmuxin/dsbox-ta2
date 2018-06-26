@@ -12,6 +12,7 @@ import signal
 import sys
 import traceback
 
+from pathlib import Path
 from pprint import pprint
 
 from importlib import reload
@@ -20,38 +21,6 @@ reload(dsbox.controller.controller)
 from dsbox.controller.controller import Controller
 import os
 controller = Controller('/', development_mode=True)
-
-
-config = {'cpus': '10',
-          'dataset_schema': '/nas/home/kyao/dsbox/data/datadrivendiscovery.org/data/seed_datasets_current/38_sick/38_sick_dataset/datasetDoc.json',
-          'executables_root': '/nas/home/kyao/dsbox/runs/output/38_sick/executables',
-          'pipeline_logs_root': '/nas/home/kyao/dsbox/runs/output/38_sick/logs',
-          'problem_root': '/nas/home/kyao/dsbox/data/datadrivendiscovery.org/data/seed_datasets_current/38_sick/38_sick_problem',
-          'problem_schema': '/nas/home/kyao/dsbox/data/datadrivendiscovery.org/data/seed_datasets_current/38_sick/38_sick_problem/problemDoc.json',
-          'ram': '10Gi',
-          'temp_storage_root': '/nas/home/kyao/dsbox/runs/output/38_sick/temp',
-          'timeout': 49,
-          'training_data_root': '/nas/home/kyao/dsbox/data/datadrivendiscovery.org/data/seed_datasets_current/38_sick/38_sick_dataset'
-          }
-'''
-config = {'cpus': '10',
-          'dataset_schema': '/Users/minazuki/Desktop/studies/master/2018Summer/DSBOX/data/38_sick/38_sick_dataset/datasetDoc.json',
-          'executables_root': '/Users/minazuki/Desktop/studies/master/2018Summer/DSBOX/data/executables',
-          'pipeline_logs_root': '/Users/minazuki/Desktop/studies/master/2018Summer/DSBOX/data/logs',
-          'problem_root': '/Users/minazuki/Desktop/studies/master/2018Summer/DSBOX/data/38_sick_problem',
-          'problem_schema': '/Users/minazuki/Desktop/studies/master/2018Summer/DSBOX/data/38_sick/38_sick_problem/problemDoc.json',
-          'ram': '10Gi',
-          'temp_storage_root': '/Users/minazuki/Desktop/studies/master/2018Summer/DSBOX/data/38_sick/temp',
-          'timeout': 49,
-          'training_data_root': '/Users/minazuki/Desktop/studies/master/2018Summer/DSBOX/data/38_sick/38_sick_dataset',
-          }
-
-
-'''
-
-# from dsbox.planner.controller import Controller, Feature
-# from dsbox.planner.event_handler import PlannerEventHandler
-
 
 def main(args):
 
@@ -89,7 +58,9 @@ def main(args):
 
             # This os._exit() cannot be caught.
             print('SIGNAL exiting {}'.format(configuration_file), flush=True)
-            os._exit(0)
+            # persist running
+            return -1
+#            os._exit(0)
 
     # Set timeout, alarm and signal handler
     if 'timeout' in config:
@@ -133,16 +104,16 @@ def main(args):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
-        description='Run DSBox TA2 system using json configuration file'
+        description='Run DSBox TA2 system on all the datasets'
     )
 
-    parser.add_argument('configuration_file',
+    parser.add_argument('--configuration_file', action='store', type=str, default=None,
                         help='D3M TA2 json configuration file')
     parser.add_argument('--timeout', action='store', type=int, default=-1,
                         help='Overide configuation timeout setting. In minutes.')
     parser.add_argument('--cpus', action='store', type=int, default=-1,
                         help='Overide configuation number of cpus usage setting')
-    parser.add_argument('--output-prefix', action='store', default=None,
+    parser.add_argument('--output_prefix', action='store', type=str, default=None,
                         help='''Overide configuation output directories paths (pipeline_logs_root, executables_root, temp_storage_root).
                         Replace path prefix "*/output/" with argument''')
     parser.add_argument('--debug', action='store_true', default=False,
@@ -150,7 +121,20 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    print(args)
+    home = str(Path.home())
 
-    result = main(args)
-    os._exit(result)
+    for conf in os.listdir(home + "/dsbox/runs2/config-seed/"):
+        print("Working for", conf)
+
+        args.configuration_file = "/nas/home/stan/dsbox/runs2/config-seed/" + conf
+
+        try:
+            result = main(args)
+            print("[INFO] Run succesfull")
+        except:
+            print("[ERROR] Failed dataset", conf)
+
+        print("\n" * 10)
+
+    #result = main(args)
+    #os._exit(result)

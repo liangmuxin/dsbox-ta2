@@ -9,6 +9,8 @@ from d3m.metadata.pipeline import Pipeline
 from d3m.runtime import Runtime
 
 from dsbox.template.search import ConfigurationSpace, ConfigurationPoint
+from dsbox.template.template import to_digraph
+import pprint
 
 # python path of primitive, i.e. 'd3m.primitives.common_primitives.RandomForestClassifier'
 PythonPath = typing.NewType('PythonPath', str)
@@ -97,7 +99,7 @@ class FittedPipeline:
             each_step = self.runtime.pipeline[n_step]
             '''
             NOTICE:
-            runing both of get_params and hyperparams will cause the error of 
+            running both of get_params and hyperparams will cause the error of 
             "AttributeError: 'RandomForestClassifier' object has no attribute 'oob_score_'"
             print(each_primitive.get_params())
             print(each_step.hyperparams)
@@ -105,6 +107,14 @@ class FittedPipeline:
             file_loc = pkl_loc + "_step_" + str(i) + ".pkl"
             with open(file_loc, "wb") as f:
                 pickle.dump(each_step, f)
+
+
+    def __str__(self):
+        desc = list(map(lambda s: (s.primitive, s.hyperparams),
+                        self.pipeline.steps))
+        return pprint.pformat(desc)
+        # print("Sorted:", dag_order)
+        # return str(dag_order)
 
     @classmethod
     def load(cls:typing.Type[TP], folder_loc: str, pipeline_id: str, dataset: Dataset) -> TP:

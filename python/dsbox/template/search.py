@@ -22,6 +22,9 @@ from .template import HYPERPARAMETER_DIRECTIVE, HyperparamDirective, DSBoxTempla
 
 from .configuration_space import DimensionName, ConfigurationSpace, SimpleConfigurationSpace, ConfigurationPoint
 
+from pprint import pprint
+from .pipeline_utilities import pipe2str
+
 T = typing.TypeVar("T")
 
 
@@ -71,19 +74,28 @@ class DimensionalSearch(typing.Generic[T]):
         '''
         return len(self.configuration_space.get_values(kw))
 
-    def search_one_iter(self, candidate: ConfigurationPoint[T] = None, candidate_value: float = None, max_per_dimension=10):
+    def generate_pipeline(self, configuration_space: ConfigurationSpace[T],
+                          dimension: typing.List[DimensionName]):
+        pass
+
+    def search_one_iter(self, candidate_in: ConfigurationPoint[T] = None,
+                        candidate_value: float = None, max_per_dimension=10):
         """
-        Performs one iteration of dimensional search.
+        Performs one iteration of dimensional search. During dimesional
+        search our algorithm iterates through all 8 steps of pipeline as
+        indicated in our configuration space and greedily optimizes the
+        pipeline one step at a time.
 
         Parameters
         ----------
-        candidate: ConfigurationPoint[T]
+        candidate_in: ConfigurationPoint[T]
             Current best candidate
         candidate_value: float
             The valude for the current best candidate
         max_per_dimension: int
             Maximunum number of values to search per dimension
         """
+<<<<<<< HEAD
 
         if candidate is None:
             # Try first, then random, then another random
@@ -99,11 +111,34 @@ class DimensionalSearch(typing.Generic[T]):
                 except:
                     print("Pipeline failed", candidate)
                     candidate = ConfigurationPoint(self.configuration_space, self.random_assignment())
+=======
+        # we first need the baseline for searching the conf_space. For this
+        # purpose we initially use first configuration and evaluate it on the
+        #  dataset. In case that failed we repeat the sampling process one
+        # more time to guarantee robustness on error reporting
+        candidate, candidate_value = self.setup_initial_candidate(candidate_in)
+>>>>>>> template
 
+        # generate an executable pipeline with random steps from conf. space.
+
+        # The actual searching process starts here.
         for dimension in self.dimension_ordering:
-            choices: typing.List[T] = self.configuration_space.get_values(dimension)
+            # get all possible choices for the step, as specified in
+            # configuration space
+            choices: typing.List[T] = self.configuration_space\
+                                          .get_values(dimension)
+
+            # TODO this is just a hack
+            if len(choices) == 1:
+                continue;
+
+            assert 0 < len(choices), \
+                f'Step {dimension} has not primitive choices!'
+
+            # the weights are assigned by template designer
             weights = [self.configuration_space.get_weight(
                 dimension, x) for x in choices]
+
             selected = random_choices_without_replacement(
                 choices, weights, max_per_dimension)
 
@@ -117,6 +152,7 @@ class DimensionalSearch(typing.Generic[T]):
                 new[dimension] = value
                 new_candidates.append(self.configuration_space.get_point(new))
 
+<<<<<<< HEAD
 
             results = self.evaluate(new_candidates)
 
@@ -125,12 +161,33 @@ class DimensionalSearch(typing.Generic[T]):
                 if not math.isnan(val):
                     sucessful_candidates.append(candidate)
                     values.append((val,data))
+=======
+            values = []
+            sucessful_candidates = []
+            for x in new_candidates:
+                try:
+                    result = self.evaluate(x)
+                    values.append(result[0])
+                    sucessful_candidates.append(x)
+                    # print("[INFO] Results:")
+                    # pprint(result)
+                    # pprint(result[0])
+                except:
+                    # print('Pipeline failed: ', x)
+                    traceback.print_exc()
+>>>>>>> template
 
-            # All primitives failed
+            # All candidates failed!
             if len(values) == 0:
+                print("[INFO] No Candidate worked!:",values)
                 return (None, None)
 
-            best_index = values.index(min(values))
+            # Find best candidate
+            if self.minimize:
+                best_index = values.index(min(values))
+            else:
+                best_index = values.index(max(values))
+                
             if candidate_value is None:
                 candidate = sucessful_candidates[best_index]
                 candidate_value = values[best_index]
@@ -162,7 +219,55 @@ class DimensionalSearch(typing.Generic[T]):
             #     candidate_value = values[best_index]
 
         # here we can get the details of pipelines from "candidate.data"
+
         return (candidate, candidate_value)
+
+
+
+    def setup_initial_candidate(self, candidate: ConfigurationPoint[T]) -> \
+            typing.Tuple[ConfigurationPoint[T], float]:
+        """
+        we first need the baseline for searching the conf_space. For this
+        purpose we initially use first configuration and evaluate it on the
+        dataset. In case that failed we repeat the sampling process one more
+        time to guarantee robustness on error reporting
+
+        Args:
+            candidate: ConfigurationPoint[T]
+
+        Returns:
+            candidate, evaluate_value : ConfigurationPoint[T], float
+        """
+        if candidate is None:
+            candidate = ConfigurationPoint(
+                self.configuration_space, self.first_assignment())
+        # first, then random, then another random
+        for i in range(2):
+            try:
+                result = self.evaluate(candidate)
+                return (candidate, result[0])
+            except:
+                print("Pipeline failed")
+                candidate = ConfigurationPoint(self.configuration_space,
+                                               self.random_assignment())
+        result = self.evaluate(candidate)
+        # try:
+        #     result = self.evaluate(candidate)
+        # except:
+        #     print("***************")
+        #     print("Pipeline failed")
+        #     candidate = ConfigurationPoint(self.configuration_space,
+        #                                    self.random_assignment())
+        #     try:
+        #         result = self.evaluate(candidate)
+        #     except:
+        #         print("Pipeline failed")
+        #         candidate = ConfigurationPoint(self.configuration_space,
+        #                                        self.random_assignment())
+        #         result = self.evaluate(candidate)
+        return (candidate, result[0])
+
+
 
     def search(self, candidate: ConfigurationPoint[T] = None, candidate_value: float = None, num_iter=3, max_per_dimension=10):
         for i in range(num_iter):
@@ -177,6 +282,7 @@ class DimensionalSearch(typing.Generic[T]):
 PythonPath = typing.NewType('PythonPath', str)
 
 PrimitiveDescription = typing.NewType('PrimitiveDescription', dict)
+
 
 class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
     """
@@ -203,7 +309,7 @@ class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
     def __init__(self, template: DSBoxTemplate,
                  configuration_space: ConfigurationSpace[PrimitiveDescription],
                  primitive_index: typing.Dict[PrimitiveDescription, PrimitiveBaseMeta],
-                 train_dataset: Dataset, 
+                 train_dataset: Dataset,
                  validation_dataset: Dataset,
                  performance_metrics: typing.List[typing.Dict],
                  resolver: Resolver = None) -> None:
@@ -215,7 +321,7 @@ class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
 
         self.template: DSBoxTemplate = template
         # self.configuration_space = configuration_space
-        self.primitive_index : typing.Dict[PrimitiveDescription, PrimitiveBaseMeta] = primitive_index
+        self.primitive_index: typing.Dict[PrimitiveDescription, PrimitiveBaseMeta] = primitive_index
         self.train_dataset = train_dataset
         self.validation_dataset = validation_dataset
         self.performance_metrics = performance_metrics
@@ -250,7 +356,7 @@ class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
         #     key: self.primitive_index[python_path].metadata.query() for key, python_path in configuration.items()}
 
         # value, new_data = self._evaluate(metadata_configuration)
-        
+
         value, new_data = self._evaluate(configuration)
         configuration.data.update(new_data)
         return value, configuration.data
@@ -266,6 +372,7 @@ class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
         training_ground_truth = run.fit_outputs[self.template.get_target_step_number()]
         training_prediction = run.fit_outputs[self.template.get_output_step_number()]
 
+        print('*'*100)
         results = run.produce(inputs=[self.validation_dataset])
         validation_ground_truth = run.produce_outputs[self.template.get_target_step_number()]
         # results == validation_prediction
@@ -292,6 +399,8 @@ class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
             'validation_metrics': validation_metrics
         }
         # Use first metric from validation
+        print(pipe2str(pipeline))
+        pprint(data)
         return validation_metrics[0]['value'], data
 
 

@@ -1,6 +1,8 @@
 import abc
 import typing
 
+import pprint
+
 import d3m.exceptions as exceptions
 
 T = typing.TypeVar('T')
@@ -45,6 +47,7 @@ class ConfigurationSpace(typing.Generic[T]):
         Returns the point asscoiate with values.
         """
         return ConfigurationPoint(self, values)
+
 
 
 class ConfigurationPoint(typing.Dict[DimensionName, T]):
@@ -104,9 +107,15 @@ class SimpleConfigurationSpace(ConfigurationSpace[T]):
         '''
         Assign the first value for each dimension
         '''
-        print(self._dimension_ordering)
+        # print(self._dimension_ordering)
         assignment: typing.Dict[DimensionName, T] = {}
         for dimension in self._dimension_ordering:
             assignment[dimension] = self.get_values(dimension)[0]
-            print(dimension, self.get_values(dimension)[0])
+            # print(dimension, self.get_values(dimension)[0])
         return ConfigurationPoint(self, assignment)
+
+    def __str__(self):
+        """
+        Returns: the configuration point as a human-readable string
+        """
+        return pprint.pformat(self._dimension_values)
