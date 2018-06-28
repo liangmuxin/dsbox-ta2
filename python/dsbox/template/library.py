@@ -79,8 +79,8 @@ class TemplateLibrary:
 
         # added new inline_templates muxin
         # self.templates.append(DefaultRegressionTemplate)
-        # self.templates.append(DefaultLinkPredictionTemplate)
-        self.templates.append(DefaultClassificationTemplate)
+        self.templates.append(DefaultGraphMatchingTemplate)
+        # self.templates.append(DefaultClassificationTemplate)
 
         # FIXME - testing purposes
         # self.templates.append(DoesNotMatchTemplate2)
@@ -293,7 +293,6 @@ class SemanticTypeDict(object):
 
         # return SimpleConfigurationSpace(definition)
         return definition
-
 
 
 class DefaultGraphMatchingTemplate(DSBoxTemplate):
