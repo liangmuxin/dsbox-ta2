@@ -7,6 +7,7 @@ import jsonpath_ng  # type: ignore
 import pprint
 from networkx import nx  # type: ignore
 import copy
+import pdb
 
 from d3m import exceptions, utils, index as d3m_index
 from d3m.metadata.base import PrimitiveMetadata
@@ -316,9 +317,9 @@ class DSBoxTemplate():
 
         self.step_number = {}
         self.addstep_mapper = {
-            ("<class 'd3m.container.pandas.DataFrame'>", "<class 'd3m.container.numpy.ndarray'>"): "d3m.primitives.datasets.DataFrameToNDArray",
+            ("<class 'd3m.container.pandas.DataFrame'>", "<class 'd3m.container.numpy.ndarray'>"): "d3m.primitives.data.DataFrameToNDArray",
             # ("<class 'd3m.container.pandas.DataFrame'>", "<class 'd3m.container.numpy.ndarray'>"): "d3m.primitives.sklearn_wrap.SKImputer",
-            ("<class 'd3m.container.numpy.ndarray'>", "<class 'd3m.container.pandas.DataFrame'>"): "d3m.primitives.datasets.NDArrayToDataFrame"
+            ("<class 'd3m.container.numpy.ndarray'>", "<class 'd3m.container.pandas.DataFrame'>"): "d3m.primitives.data.NDArrayToDataFrame"
         }
 
         # Need to be set by subclass inheriting DSBoxTemplate
@@ -485,7 +486,7 @@ class DSBoxTemplate():
         return False
 
     def bind_primitive_IO(self, primitive, *templateIO):
-        #print(templateIO)
+        # print(templateIO)
         if len(templateIO) > 0:
             primitive.add_argument(
                 name="inputs",
@@ -518,7 +519,7 @@ class DSBoxTemplate():
         # save temporary output for another step to take as input
         outputs = {}
         outputs["template_input"] = templateinput
-
+        # pdb.set_trace()
         # iterate through steps in the given binding and add each step to the
         #  pipeline. The IO and hyperparameter are also handled here.
         for i, step in enumerate(sequence):
@@ -528,7 +529,7 @@ class DSBoxTemplate():
             if primitive_name in self.primitive:
                 primitive_step = PrimitiveStep(d3m_index.get_primitive(primitive_name).metadata.query())
             else:
-                raise exceptions.InvalidArgumentValueError("error, can't find the primitive")
+                raise exceptions.InvalidArgumentValueError("error, can't find the primitive", primitive_name)
 
             if binding[step]["hyperparameters"] != {}:
                 hyper = binding[step]["hyperparameters"]
@@ -587,10 +588,10 @@ class DSBoxTemplate():
                         raise exceptions.InvalidArgumentValueError("Wrong format of the configuration space data: No primitive name found!")
                     else:
                         if "hyperparameters" not in description:
-                            description["hyperparameters"] : {}
+                            description["hyperparameters"]: {}
                         value.append({
                             "primitive": description["primitive"],
-                            "hyperparameters":description["hyperparameters"]
+                            "hyperparameters": description["hyperparameters"]
                         })
                 else:
                     # other data format, not supported, raise error

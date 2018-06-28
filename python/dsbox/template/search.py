@@ -9,7 +9,7 @@ import d3m.exceptions as exceptions
 
 from d3m import utils
 from d3m.container.dataset import Dataset
-from d3m.metadata.base import PrimitiveMetadata
+from d3m.metadata.base import PrimitiveMetadata, Metadata, ALL_ELEMENTS
 from d3m.metadata.hyperparams import Hyperparams
 from d3m.metadata.pipeline import Resolver
 from d3m.primitive_interfaces.base import PrimitiveBaseMeta, PrimitiveBase
@@ -20,11 +20,30 @@ from dsbox.schema.problem import optimization_type, OptimizationType
 from .template import HYPERPARAMETER_DIRECTIVE, HyperparamDirective, DSBoxTemplate
 
 from .configuration_space import DimensionName, ConfigurationSpace, SimpleConfigurationSpace, ConfigurationPoint
-
+import pdb
 from pprint import pprint
 from .pipeline_utilities import pipe2str
 
 T = typing.TypeVar("T")
+# get target columns in a dataset for generating metrics, will also gives index column --Muxin
+
+
+def get_target_columns(dataset: 'Dataset', problem_doc_metadata: 'Metadata'):
+    problem = problem_doc_metadata.query(())["inputs"]["data"]
+    datameta = dataset.metadata
+    target = problem[0]["targets"]
+    resID = target[0]["resID"]
+    colIndex = target[0]["colIndex"]
+    datalength = datameta.query((resID, ALL_ELEMENTS,))["dimension"]['length']
+    targetlist = []
+    for v in range(datalength):
+        types = datameta.query((resID, ALL_ELEMENTS, v))["semantic_types"]
+        for t in types:
+            if t == 'https://metadata.datadrivendiscovery.org/types/PrimaryKey':
+                targetlist.append(v)
+    targetlist.append(colIndex)
+    targetcol = dataset[resID].iloc[:, targetlist]
+    return targetcol
 
 
 class DimensionalSearch(typing.Generic[T]):
@@ -111,7 +130,7 @@ class DimensionalSearch(typing.Generic[T]):
 
             # TODO this is just a hack
             if len(choices) == 1:
-                continue;
+                continue
 
             assert 0 < len(choices), \
                 f'Step {dimension} has not primitive choices!'
@@ -149,7 +168,7 @@ class DimensionalSearch(typing.Generic[T]):
 
             # All candidates failed!
             if len(values) == 0:
-                print("[INFO] No Candidate worked!:",values)
+                print("[INFO] No Candidate worked!:", values)
                 return (None, None)
 
             # Find best candidate
@@ -157,7 +176,7 @@ class DimensionalSearch(typing.Generic[T]):
                 best_index = values.index(min(values))
             else:
                 best_index = values.index(max(values))
-                
+
             if candidate_value is None:
                 candidate = sucessful_candidates[best_index]
                 candidate_value = values[best_index]
@@ -167,8 +186,6 @@ class DimensionalSearch(typing.Generic[T]):
         # here we can get the details of pipelines from "candidate.data"
 
         return (candidate, candidate_value)
-
-
 
     def setup_initial_candidate(self, candidate: ConfigurationPoint[T]) -> \
             typing.Tuple[ConfigurationPoint[T], float]:
@@ -213,8 +230,6 @@ class DimensionalSearch(typing.Generic[T]):
         #         result = self.evaluate(candidate)
         return (candidate, result[0])
 
-
-
     def search(self, candidate: ConfigurationPoint[T] = None, candidate_value: float = None, num_iter=3, max_per_dimension=10):
         for i in range(num_iter):
             candidate, candidate_value = self.search_one_iter(candidate, candidate_value, max_per_dimension=max_per_dimension)
@@ -255,6 +270,7 @@ class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
     def __init__(self, template: DSBoxTemplate,
                  configuration_space: ConfigurationSpace[PrimitiveDescription],
                  primitive_index: typing.Dict[PrimitiveDescription, PrimitiveBaseMeta],
+                 problem: Metadata,
                  train_dataset: Dataset,
                  validation_dataset: Dataset,
                  performance_metrics: typing.List[typing.Dict],
@@ -268,6 +284,7 @@ class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
         self.template: DSBoxTemplate = template
         # self.configuration_space = configuration_space
         self.primitive_index: typing.Dict[PrimitiveDescription, PrimitiveBaseMeta] = primitive_index
+        self.problem = problem
         self.train_dataset = train_dataset
         self.validation_dataset = validation_dataset
         self.performance_metrics = performance_metrics
@@ -299,14 +316,13 @@ class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
 
         # Todo: update ResourceManager to run pipeline:  ResourceManager.add_pipeline(pipeline)
         run = Runtime(pipeline)
-
         run.fit(inputs=[self.train_dataset])
-        training_ground_truth = run.fit_outputs[self.template.get_target_step_number()]
+        training_ground_truth = get_target_columns(self.train_dataset, self.problem)
         training_prediction = run.fit_outputs[self.template.get_output_step_number()]
 
-        print('*'*100)
+        print('*' * 100)
         results = run.produce(inputs=[self.validation_dataset])
-        validation_ground_truth = run.produce_outputs[self.template.get_target_step_number()]
+        validation_ground_truth = get_target_columns(self.validation_dataset, self.problem)
         # results == validation_prediction
         validation_prediction = run.produce_outputs[self.template.get_output_step_number()]
 
@@ -317,11 +333,11 @@ class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
             params: typing.Dict = metric_description['params']
             training_metrics.append({
                 'metric': metric_description['metric'],
-                'value': metric(training_ground_truth, training_prediction)
+                'value': metric(training_ground_truth.iloc[:, -1].astype(str), training_prediction.iloc[:, -1].astype(str))
             })
             validation_metrics.append({
                 'metric': metric_description['metric'],
-                'value': metric(validation_ground_truth, validation_prediction)
+                'value': metric(validation_ground_truth.iloc[:, -1].astype(str), validation_prediction.iloc[:, -1].astype(str))
             })
 
         data = {

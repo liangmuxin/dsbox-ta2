@@ -5,6 +5,7 @@ from d3m.metadata.base import Metadata
 import networkx as nx
 import json
 import os
+import pdb
 
 
 class Runtime:
@@ -88,7 +89,7 @@ class Runtime:
                     else:
                         self.produce_order.add(step_source)
                         current_step = step_source
-        
+
         # kyao!!!!
         self.produce_order = set(self.execution_order)
         self.fit_outputs = []
@@ -116,9 +117,10 @@ class Runtime:
                     primitive_arguments[argument] = arguments[argument][value['source']]
 
             if isinstance(self.pipeline_description.steps[n_step], PrimitiveStep):
+                # pdb.set_trace()
                 primitives_outputs[n_step] = self._primitive_step_fit(n_step, self.pipeline_description.steps[n_step], primitive_arguments)
                 #print("output of no",n_step," is:::")
-                #print(primitives_outputs[n_step])
+                # print(primitives_outputs[n_step])
 
         # kyao!!!!
         self.fit_outputs = primitives_outputs
@@ -165,16 +167,16 @@ class Runtime:
             if param in training_arguments_primitive:
                 training_arguments[param] = value
 
-        #FIXME: once hyperparameters work, simplify code below
+        # FIXME: once hyperparameters work, simplify code below
         model = primitive(hyperparams=primitive_hyperparams(primitive_hyperparams.defaults()))
         try:
             model = primitive(hyperparams=primitive_hyperparams(
-                        primitive_hyperparams.defaults(), **custom_hyperparams))
+                primitive_hyperparams.defaults(), **custom_hyperparams))
         except:
             print("******************\n[ERROR]Hyperparameters unsuccesfully set - using defaults")
             model = primitive(hyperparams=primitive_hyperparams(primitive_hyperparams.defaults()))
 
-        #print('-'*100)
+        # print('-'*100)
         # print('step', n_step, 'primitive', primitive)
         # print('training_arguments', training_arguments)
         model.set_training_data(**training_arguments)
@@ -223,10 +225,10 @@ class Runtime:
                         continue
             if isinstance(self.pipeline_description.steps[n_step], PrimitiveStep):
                 if n_step in self.produce_order:
-                    #print('-'*100)
+                    # print('-'*100)
                     #print('step', n_step, 'primitive', primitive)
                     #import pdb
-                    #pdb.set_trace()
+                    # pdb.set_trace()
                     steps_outputs[n_step] = self.pipeline[n_step].produce(**produce_arguments).value
                 else:
                     steps_outputs[n_step] = None
