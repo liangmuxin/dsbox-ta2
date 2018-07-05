@@ -84,10 +84,6 @@ class FittedPipeline:
 
         # print("Writing:",self)
 
-        json_loc = os.path.join(pipeline_dir, self.id + '-1.json')
-        with open(json_loc, 'w') as out:
-            self.pipeline.to_json(out)
-
         # store fitted_pipeline id
         structure = self.pipeline.to_json_structure()
         structure['fitted_pipeline_id'] = self.id
@@ -101,7 +97,7 @@ class FittedPipeline:
         # save the pipeline spec under executables to be a json file simply specifies the pipeline id.
         json_loc = os.path.join(executable_dir, self.id + '.json')
         with open(json_loc, 'w') as out:
-            json.dump({"pipeline_id" : self.id}, out)
+            json.dump({"fitted_pipeline_id": self.id}, out)
 
         # save the pickle files of each primitive step
         for i in range(0, len(self.runtime.execution_order)):
@@ -127,20 +123,26 @@ class FittedPipeline:
         # load pipeline from json
         pipeline_dir = os.path.join(folder_loc, 'pipelines')
         executable_dir = os.path.join(folder_loc, 'executables')
-        supporting_files_dir = os.path.join(folder_loc, 'supporting_files', pipeline_id)
 
-        json_loc = os.path.join(pipeline_dir, pipeline_id + '.json')
+        pipeline_spec_loc = os.path.join(executable_dir, pipeline_id + '.json')
+
+        with open(pipeline_spec_loc, 'r') as f:
+            fitted_pipeline_id = json.load(f).get('fitted_pipeline_id')
+
+        pipeline_definition_loc = os.path.join(pipeline_dir, fitted_pipeline_id + '.json')
         print("The following pipeline file will be loaded:")
-        print(json_loc)
-        with open(json_loc, 'r') as f:
+        print(pipeline_definition_loc)
+
+        with open(pipeline_definition_loc, 'r') as f:
             structure = json.load(f)
 
-        fitted_pipeline_id = structure['fitted_pipeline_id']
-        dataset_id = structure['dataset_id']
+        dataset_id = structure.get('dataset_id')
 
         pipeline_to_load = Pipeline.from_json_structure(structure)
 
-        # load detail fitted parameters from pkl files
+        # load detail fitted parameters from pkl files in supporting_files/<fitted_pipeline_id>
+        supporting_files_dir = os.path.join(folder_loc, 'supporting_files', fitted_pipeline_id)
+
         run = Runtime(pipeline_to_load)
 
         for i in range(0, len(run.execution_order)):
