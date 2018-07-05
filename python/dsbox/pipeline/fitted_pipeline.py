@@ -76,9 +76,11 @@ class FittedPipeline:
         # print(folder_loc)
 
         pipeline_dir = os.path.join(folder_loc, 'pipelines')
-        executable_dir = os.path.join(folder_loc, 'executables', self.id)
+        executable_dir = os.path.join(folder_loc, 'executables')
+        supporting_files_dir = os.path.join(folder_loc, 'supporting_files', self.id)
         os.makedirs(pipeline_dir, exist_ok=True)
         os.makedirs(executable_dir, exist_ok=True)
+        os.makedirs(supporting_files_dir, exist_ok=True)
 
         # print("Writing:",self)
 
@@ -96,12 +98,17 @@ class FittedPipeline:
         with open(json_loc, 'w') as out:
             json.dump(structure, out)
 
+        # save the pipeline spec under executables to be a json file simply specifies the pipeline id.
+        json_loc = os.path.join(executable_dir, self.id + '.json')
+        with open(json_loc, 'w') as out:
+            json.dump({"pipeline_id" : self.id}, out)
+
         # save the pickle files of each primitive step
         for i in range(0, len(self.runtime.execution_order)):
             print("Now saving step_", i)
             #n_step = self.runtime.execution_order[i]
             each_step = self.runtime.pipeline[i]
-            file_loc = os.path.join(executable_dir, "step_" + str(i) + ".pkl")
+            file_loc = os.path.join(supporting_files_dir, "step_" + str(i) + ".pkl")
             with open(file_loc, "wb") as f:
                 pickle.dump(each_step, f)
 
@@ -119,7 +126,8 @@ class FittedPipeline:
         '''
         # load pipeline from json
         pipeline_dir = os.path.join(folder_loc, 'pipelines')
-        executable_dir = os.path.join(folder_loc, 'executables', pipeline_id)
+        executable_dir = os.path.join(folder_loc, 'executables')
+        supporting_files_dir = os.path.join(folder_loc, 'supporting_files', pipeline_id)
 
         json_loc = os.path.join(pipeline_dir, pipeline_id + '.json')
         print("The following pipeline file will be loaded:")
@@ -137,7 +145,7 @@ class FittedPipeline:
 
         for i in range(0, len(run.execution_order)):
             print("Now loading step", i)
-            file_loc = os.path.join(executable_dir, "step_" + str(i) + ".pkl")
+            file_loc = os.path.join(supporting_files_dir, "step_" + str(i) + ".pkl")
             with open(file_loc, "rb") as f:
                 each_step = pickle.load(f)
                 run.pipeline[i] = each_step
