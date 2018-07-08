@@ -178,11 +178,12 @@ class DimensionalSearch(typing.Generic[T]):
                         map(lambda c: (c, cache), new_candidates)
                     )
 
-                # results = map(self.evaluate,new_candidates)
+                # results = list(map(self.evaluate, map(lambda c: (c, cache), new_candidates)))
 
                 for res, x in zip(results, new_candidates):
                     test_values.append(res['test_metrics'][0]['value'])
-                    cross_validation_values.append(res['cross_validation_metrics'][0]['value'])
+                    if len(res['cross_validation_metrics']) > 0:
+                        cross_validation_values.append(res['cross_validation_metrics'][0]['value'])
                     # pipeline = self.template.to_pipeline(x)
                     # res['pipeline'] = pipeline
                     res['fitted_pipeline'] = res['fitted_pipeline']
@@ -211,16 +212,19 @@ class DimensionalSearch(typing.Generic[T]):
             # Find best candidate
             if self.minimize:
                 best_index = test_values.index(min(test_values))
-                best_cv_index = cross_validation_values.index(min(cross_validation_values))
             else:
                 best_index = test_values.index(max(test_values))
-                best_cv_index = cross_validation_values.index(max(cross_validation_values))
             print("[INFO] Best index:", best_index, "___", test_values[best_index])
-            if best_index==best_cv_index:
-                print("[INFO] Best CV index:", best_cv_index, "___", cross_validation_values[best_cv_index])
-            else:
-                print("[WARN] Best CV index:", best_cv_index, "___", cross_validation_values[best_cv_index])
-                print("[WARN] CV detail values:", ['{:.4f}'.format(x) for x in results[best_cv_index]['cross_validation_metrics'][0]['values']])
+            if len(cross_validation_values) > 0:
+                if self.minimize:
+                    best_cv_index = cross_validation_values.index(min(cross_validation_values))
+                else:
+                    best_cv_index = cross_validation_values.index(max(cross_validation_values))
+                if best_index==best_cv_index:
+                    print("[INFO] Best CV index:", best_cv_index, "___", cross_validation_values[best_cv_index])
+                else:
+                    print("[WARN] Best CV index:", best_cv_index, "___", cross_validation_values[best_cv_index])
+                    print("[WARN] CV detail values:", ['{:.4f}'.format(x) for x in results[best_cv_index]['cross_validation_metrics'][0]['values']])
             if candidate_value is None:
                 candidate = sucessful_candidates[best_index]
                 candidate_value = test_values[best_index]
