@@ -8,7 +8,9 @@ import logging
 import sys
 import tempfile
 from collections import defaultdict
+
 from sklearn.model_selection import KFold, StratifiedKFold  # type: ignore
+
 from d3m.metadata.problem import PerformanceMetric
 from d3m.metadata.hyperparams import Hyperparams
 
@@ -19,7 +21,6 @@ from d3m.metadata.base import Metadata
 from d3m.metadata.pipeline import Pipeline, PrimitiveStep, Resolver
 from d3m.primitive_interfaces import base
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(levelname)s] %(name)s -- %(message)s')
 _logger = logging.getLogger(__name__)
 
 class Runtime:
@@ -109,7 +110,8 @@ class Runtime:
         self.fit_outputs: typing.List = []
         self.produce_outputs: typing.List  = []
         self.metric_descriptions: typing.List  = []
-        self.cross_validation_result: typing.List = []
+        self.cross_validation_metrics: typing.List = []
+        self.cross_validation_targets: typing.Dict = {}
 
     def set_metric_descriptions(self, metric_descriptions):
         self.metric_descriptions = metric_descriptions
@@ -226,7 +228,7 @@ class Runtime:
 
         # kyao!!!!
         if 'runtime' in step.primitive_description:
-            self.cross_validation_result = self._cross_validation(
+            self._cross_validation(
                 primitive, training_arguments, produce_params, primitive_hyperparams, custom_hyperparams,
                 step.primitive_description['runtime'])
 
@@ -241,7 +243,7 @@ class Runtime:
                           primitive_hyperparams: Hyperparams,
                           custom_hyperparams: typing.Dict,
                           runtime_instr: typing.Dict,
-                          seed: int = 4767) -> typing.List:
+                          seed: int = 4767) -> None:
 
         _logger.debug('cross-val primitive: %s' % str(primitive))
 
@@ -280,7 +282,7 @@ class Runtime:
 
 
                         if model is None:
-                            return result
+                            return
 
                         trainX = X.take(train, axis=0)
                         trainY = y.take(train, axis=0).values.ravel()
@@ -314,9 +316,9 @@ class Runtime:
                             # traceback.print_exc(e)
 
         if num == 0:
-            return results
+            return
 
-        average_metrics: typing.Dict[str, dict] = {}
+        average_metrics: typing.Dict[str, float] = {}
         for name, values in validation_metrics.items():
             average_metrics[name] = sum(values)/len(values)
 
@@ -325,7 +327,6 @@ class Runtime:
             result_by_metric['metric'] = metric_description['metric']
             result_by_metric['value'] = average_metrics[metric_description['metric']]
             result_by_metric['values'] = validation_metrics[metric_description['metric']]
-            result_by_metric['targets'] = targets[metric_description['metric']]
             results.append(result_by_metric)
 
         for result in results:
@@ -333,8 +334,8 @@ class Runtime:
             _logger.debug('cross-validation details: %s %s',
                           result['metric'], str(['%.4f' % x for x in result['values']]))
 
-        return results
-
+        self.cross_validation_metrics = results
+        self.cross_validation_targets = targets
 
     def _primitive_arguments(self, primitive: typing.Type[base.PrimitiveBase], method: str) -> set:
         """

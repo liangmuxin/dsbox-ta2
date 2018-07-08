@@ -92,7 +92,7 @@ class FittedPipeline:
         self.runtime.produce(**arguments)
 
     def get_cross_validation_metrics(self) -> typing.List:
-        return self.runtime.cross_validation_result
+        return self.runtime.cross_validation_metrics
 
     def get_fit_step_output(self, step_number: int):
         return self.runtime.fit_outputs[step_number]
