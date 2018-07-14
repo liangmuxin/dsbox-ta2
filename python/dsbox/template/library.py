@@ -99,7 +99,7 @@ class TemplateLibrary:
         # self.templates.append(DefaultGraphMatchingTemplate)
         # self.templates.append(DoesNotMatchTemplate2)
 
-        self.templates.append(MuxinTA1ClassificationTemplate2)
+        self.templates.append(MuxinTA1ClassificationTemplate4)
 
 
 class SemanticTypeDict(object):
@@ -757,7 +757,7 @@ class MuxinTA1ClassificationTemplate1(DSBoxTemplate):
     def __init__(self):
         DSBoxTemplate.__init__(self)
         self.template = {
-            "name": "Default_classification_template",
+            "name": "MuxinTA1ClassificationTemplate1",
             "taskSubtype": {TaskSubtype.BINARY.name, TaskSubtype.MULTICLASS.name},
             "taskType": TaskType.CLASSIFICATION.name,
             "inputType": "table",  # See SEMANTIC_TYPES.keys() for range of values
@@ -865,7 +865,7 @@ class MuxinTA1ClassificationTemplate2(DSBoxTemplate):
     def __init__(self):
         DSBoxTemplate.__init__(self)
         self.template = {
-            "name": "Default_classification_template",
+            "name": "MuxinTA1ClassificationTemplate2",
             "taskSubtype": {TaskSubtype.BINARY.name, TaskSubtype.MULTICLASS.name},
             "taskType": TaskType.CLASSIFICATION.name,
             "inputType": "table",  # See SEMANTIC_TYPES.keys() for range of values
@@ -959,7 +959,7 @@ class MuxinTA1ClassificationTemplate3(DSBoxTemplate):
     def __init__(self):
         DSBoxTemplate.__init__(self)
         self.template = {
-            "name": "Default_classification_template",
+            "name": "MuxinTA1ClassificationTemplate3",
             "taskSubtype": {TaskSubtype.BINARY.name, TaskSubtype.MULTICLASS.name},
             "taskType": TaskType.CLASSIFICATION.name,
             "inputType": "table",  # See SEMANTIC_TYPES.keys() for range of values
@@ -1053,7 +1053,7 @@ class MuxinTA1ClassificationTemplate4(DSBoxTemplate):
     def __init__(self):
         DSBoxTemplate.__init__(self)
         self.template = {
-            "name": "Default_classification_template",
+            "name": "MuxinTA1ClassificationTemplate4",
             "taskSubtype": {TaskSubtype.BINARY.name, TaskSubtype.MULTICLASS.name},
             "taskType": TaskType.CLASSIFICATION.name,
             "inputType": "table",  # See SEMANTIC_TYPES.keys() for range of values
