@@ -51,6 +51,7 @@ class TemplateLibrary:
             self._load_library()
 
         self.all_templates = {
+            'random_forest_template': RandomForestTemplate, 
             "Default_classification_template": DefaultClassificationTemplate,
             "dsbox_classification_template": dsboxClassificationTemplate,
             "Default_regression_template": DefaultRegressionTemplate,
@@ -123,6 +124,8 @@ class TemplateLibrary:
 
     def _load_inline_templates(self):
 
+        # self.templates.append(RandomForestTemplate)
+
         self.templates.append(DefaultRegressionTemplate)
         self.templates.append(DefaultClassificationTemplate)
         #self.templates.append(DefaultTimeseriesCollectionTemplate)
@@ -181,6 +184,8 @@ class SemanticTypeDict(object):
 
         # return SimpleConfigurationSpace(definition)
         return definition
+
+
 
 
 
@@ -394,6 +399,123 @@ def dsbox_imputer(encoded_name: str = "cast_1_step",
         ]
 
 
+class RandomForestTemplate(DSBoxTemplate):
+    def __init__(self):
+        DSBoxTemplate.__init__(self)
+        self.template = {
+            "name": "random_forest_template",
+            "taskSubtype": {TaskSubtype.BINARY.name, TaskSubtype.MULTICLASS.name},
+            "taskType": TaskType.CLASSIFICATION.name,
+        # See TaskType, range include 'CLASSIFICATION', 'CLUSTERING', 'COLLABORATIVE_FILTERING',
+            # 'COMMUNITY_DETECTION', 'GRAPH_CLUSTERING', 'GRAPH_MATCHING', 'LINK_PREDICTION',
+            # 'REGRESSION', 'TIME_SERIES_FORECASTING', 'VERTEX_NOMINATION'
+            "inputType": "table",  # See SEMANTIC_TYPES.keys() for range of values
+            "output": "model_step",  # Name of the final step generating the prediction
+            "target": "extract_target_step",  # Name of the step generating the ground truth
+            "steps": [
+                {
+                    "name": "denormalize_step",
+                    "primitives": ["d3m.primitives.dsbox.Denormalize"],
+                    "inputs": ["template_input"]
+                },
+                {
+                    "name": "to_dataframe_step",
+                    "primitives": ["d3m.primitives.datasets.DatasetToDataFrame"],
+                    "inputs": ["denormalize_step"]
+                },
+                {
+                    "name": "extract_attribute_step",
+                    "primitives": [{
+                        "primitive": "d3m.primitives.data.ExtractColumnsBySemanticTypes",
+                        "hyperparameters":
+                            {
+                                'semantic_types': (
+                                'https://metadata.datadrivendiscovery.org/types/Attribute',),
+                                'use_columns': (),
+                                'exclude_columns': ()
+                            }
+                    }],
+                    "inputs": ["to_dataframe_step"]
+                },
+                {
+                    "name": "profiler_step",
+                    "primitives": ["d3m.primitives.dsbox.Profiler"],
+                    "inputs": ["extract_attribute_step"]
+                },
+                {
+                    "name": "clean_step",
+                    "primitives": ["d3m.primitives.dsbox.CleaningFeaturizer"],
+                    "inputs": ["profiler_step"]
+                },
+                {
+                    "name": "corex_step",
+                    "primitives": [
+                        {
+                            "primitive": "d3m.primitives.dsbox.CorexText",
+                            "hyperparameters":
+                                {
+                                    # 'n_hidden':[(10)],
+                                    # 'threshold':[(0)],
+                                    # # 'threshold':[(0), (500)],
+                                    # 'n_grams':[(1), (5)],
+                                    # 'max_df':[(.9)],
+                                    # 'min_df':[(.02)],
+                                }
+                        },
+                    ],
+                    "inputs": ["clean_step"]
+                },
+                {
+                    "name": "encoder_step",
+                    "primitives": ["d3m.primitives.dsbox.Encoder"],
+                    "inputs": ["corex_step"]
+                },
+                {
+                    "name": "impute_step",
+                    "primitives": ["d3m.primitives.sklearn_wrap.SKImputer"],
+                    "inputs": ["encoder_step"]
+                },
+                {
+                    "name": "extract_target_step",
+                    "primitives": [{
+                        "primitive": "d3m.primitives.data.ExtractColumnsBySemanticTypes",
+                        "hyperparameters":
+                            {
+                                'semantic_types': (
+                                'https://metadata.datadrivendiscovery.org/types/Target',
+                                'https://metadata.datadrivendiscovery.org/types/SuggestedTarget',),
+                                'use_columns': (),
+                                'exclude_columns': ()
+                            }
+                    }],
+                    "inputs": ["to_dataframe_step"]
+                },
+                {
+                    "name": "model_step",
+                    "runtime": {
+                        "cross_validation": 10,
+                        "stratified": True
+                    },
+                    "primitives": [
+                        {
+                        "primitive":
+                            "d3m.primitives.sklearn_wrap.SKRandomForestClassifier",
+                        "hyperparameters":
+                            {
+                            'max_depth': [(2),(4),(8)],
+                            }
+                        },
+                    ],
+                    "inputs": ["impute_step", "extract_target_step"]
+                }
+            ]
+        }
+
+    # @override
+    def importance(datset, problem_description):
+        return 7
+
+
 class DefaultClassificationTemplate(DSBoxTemplate):
     def __init__(self):
         DSBoxTemplate.__init__(self)
@@ -498,7 +620,7 @@ class DefaultClassificationTemplate(DSBoxTemplate):
                         "hyperparameters":
                             {
                             # 'max_depth': [(2),(4),(8)], #(10), #
-                            # 'n_estimators':[(10),(20),(30)]
+                            # 'n_estimators':[(10),(20)]
                             }
                         },
                         # {
