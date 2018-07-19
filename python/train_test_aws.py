@@ -17,7 +17,7 @@ def call_ta2search(command):
 
     try:
         p.communicate(timeout=timeout * 60)
-    except TimeoutExpired:
+    except subprocess.TimeoutExpired:
         p.kill()
         print(command, "took too long and was terminated" + "\n\n")
 
