@@ -105,13 +105,13 @@ class FittedPipeline:
     def get_produce_step_output(self, step_number: int):
         return self.runtime.produce_outputs[step_number]
 
-    def save(self, folder_loc : str) -> None:
+    def save(self, folder_loc: str) -> None:
         '''
         Save the given fitted pipeline from TemplateDimensionalSearch
         '''
-        pipeline_dir = os.path.join(folder_loc, 'pipelines')
-        executable_dir = os.path.join(folder_loc, 'executables')
-        supporting_files_dir = os.path.join(folder_loc, 'supporting_files',
+        pipeline_dir = os.path.join(folder_loc, 'pipelines2')
+        executable_dir = os.path.join(folder_loc, 'executables2')
+        supporting_files_dir = os.path.join(folder_loc, 'supporting_files2',
                                             self.id)
         os.makedirs(pipeline_dir, exist_ok=True)
         os.makedirs(executable_dir, exist_ok=True)
@@ -132,7 +132,7 @@ class FittedPipeline:
                 if value == 0.0:
                     rank = sys.float_info.max
                 else:
-                    rank = 1/value
+                    rank = 1 / value
             else:
                 rank = value
         structure['pipeline_rank'] = rank
@@ -170,7 +170,7 @@ class FittedPipeline:
         # return str(dag_order)
 
     @classmethod
-    def load(cls:typing.Type[TP], folder_loc: str,
+    def load(cls: typing.Type[TP], folder_loc: str,
              pipeline_id: str, log_dir: str, dataset_id: str = None,) -> typing.Tuple[TP, Runtime]:
         '''
         Load the pipeline with given pipeline id and folder location
@@ -210,7 +210,6 @@ class FittedPipeline:
             with open(file_loc, "rb") as f:
                 each_step = pickle.load(f)
                 run.pipeline[i] = each_step
-
 
         # fitted_pipeline_loaded = cls(pipeline_to_load, run, dataset)
         fitted_pipeline_loaded = cls(pipeline=pipeline_to_load,

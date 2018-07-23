@@ -581,6 +581,8 @@ class TemplateDimensionalSearch(DimensionalSearch[PrimitiveDescription]):
         fitted_pipeline.auxiliary = dict(data)
 
         # Save results
+        print("@" * 10)
+        print(self.output_directory)
         if self.output_directory is not None and dump2disk:
             fitted_pipeline.save(self.output_directory)
             # _logger.info("Test pickled pipeline. id: {}".format(fitted_pipeline.id))
